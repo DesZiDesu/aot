@@ -4,6 +4,8 @@ import discord
 from discord.ext import tasks
 from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput
 
+from discord import app_commands
+
 from aot_bot_instance import bot
 from aot_shared import (
     t, load_players, save_players, load_config, save_config,
@@ -75,10 +77,66 @@ async def _notify_admins_stamina(guild, uid, player, gid):
             await cv2_dm(m, msg)
 
 
-# ── /shifter command ──────────────────────────────────────────────────────────
+# ── Shifter admin view ────────────────────────────────────────────────────────
 
-@bot.tree.command(name="shifter", description="Titan shifter panel")
-async def shifter_cmd(ix: discord.Interaction):
+class ShifterAdminView(LayoutView):
+    def __init__(self, gid, guild=None):
+        super().__init__(timeout=300)
+        self.gid = gid; self.guild = guild
+        self._build()
+
+    def _build(self):
+        self.clear_items()
+        cfg    = load_config(self.gid)
+        titans = cfg.get("shifters", [])
+        access = cfg.get("shifter_access", [])
+        text   = (f"**{t(self.gid, 'shifter_admin_title')}**\n\n"
+                  f"**Titans:** {', '.join(titans) or '*None*'}\n"
+                  f"**Users with access:** {len(access)}")
+        grant_btn   = Button(label=t(self.gid, "grant_btn"),   style=discord.ButtonStyle.green,     custom_id="sad_grant")
+        revoke_btn  = Button(label=t(self.gid, "revoke_btn"),  style=discord.ButtonStyle.danger,    custom_id="sad_revoke")
+        tracker_btn = Button(label=t(self.gid, "tracker_btn"), style=discord.ButtonStyle.secondary, custom_id="sad_track")
+        done_btn    = Button(label=t(self.gid, "done_btn"),    style=discord.ButtonStyle.danger,    custom_id="sad_done")
+        grant_btn.callback   = self._grant
+        revoke_btn.callback  = self._revoke
+        tracker_btn.callback = self._tracker
+        done_btn.callback    = self._done
+        self.add_item(Container(
+            TextDisplay(text), Separator(),
+            ActionRow(grant_btn, revoke_btn),
+            ActionRow(tracker_btn),
+            ActionRow(done_btn),
+        ))
+
+    async def _grant(self, ix):
+        from aot_admin import GrantShifterView
+        await ix.response.edit_message(view=GrantShifterView(self.gid, self))
+
+    async def _revoke(self, ix):
+        from aot_admin import RevokeShView
+        await ix.response.edit_message(view=RevokeShView(self.gid, self))
+
+    async def _tracker(self, ix):
+        from aot_admin import ShifterTrackerView
+        await ix.response.edit_message(view=ShifterTrackerView(self.gid, self, ix.guild))
+
+    async def _done(self, ix):
+        self.clear_items()
+        self.add_item(Container(TextDisplay(f"*{t(self.gid, 'panel_closed')}*")))
+        await ix.response.edit_message(view=self)
+
+
+# ── /shifter command group ────────────────────────────────────────────────────
+
+shifter_group = app_commands.Group(
+    name="shifter",
+    description="Titan shifter commands",
+    description_localizations={"th": "คำสั่งผู้ถือพลังไทแทน"},
+)
+
+@shifter_group.command(name="open", description="Open your titan shifter panel",
+                       description_localizations={"th": "เปิดแผงผู้ถือพลังไทแทน"})
+async def shifter_open(ix: discord.Interaction):
     gid = ix.guild_id; uid = ix.user.id
     if not has_shifter_access(gid, uid):
         v = LayoutView(timeout=60)
@@ -93,6 +151,20 @@ async def shifter_cmd(ix: discord.Interaction):
         await ix.response.send_message(view=v, ephemeral=True)
         return
     await ix.response.send_message(view=ShifterMainView(uid, gid), ephemeral=True)
+
+@shifter_group.command(name="admin", description="Shifter admin panel",
+                       description_localizations={"th": "แผงผู้ดูแลระบบผู้ถือพลัง"})
+async def shifter_admin(ix: discord.Interaction):
+    if not ix.guild: return
+    m = ix.guild.get_member(ix.user.id)
+    if not m or not (m.guild_permissions.administrator or m.guild_permissions.manage_guild):
+        v = LayoutView(timeout=60)
+        v.add_item(Container(TextDisplay(t(ix.guild_id, "admin_only"))))
+        await ix.response.send_message(view=v, ephemeral=True)
+        return
+    await ix.response.send_message(view=ShifterAdminView(ix.guild_id, ix.guild), ephemeral=True)
+
+bot.tree.add_command(shifter_group)
 
 
 # ── ShifterMainView ───────────────────────────────────────────────────────────

@@ -27,6 +27,11 @@ DEFAULT_CONFIG = {
     "titan_announcement_channel": None,
     "pending_moveset_requests": {},
     "stamina_regen_per_minute": 1,
+    "announcement_channels": [],
+    "announcement_permitted_roles": [],
+    "currency_name": "Coins",
+    "currency_emoji": "",
+    "currency_image": "",
 }
 
 # ── i18n ─────────────────────────────────────────────────────────────────────
@@ -123,6 +128,77 @@ LANG = {
         "item_used_msg": "✅ คุณใช้ **{item}** แล้ว",
         "item_given_msg": "🎁 **{sender}** ส่ง **{item}** ให้คุณ!",
         "item_sold_msg": "💰 คุณขาย **{item}** ได้ **{price}** เหรียญ ยอดรวม: **{balance}** เหรียญ",
+        "config_title": "ตั้งค่า",
+        "config_page": "หน้า {page}/{total}",
+        "prev_btn": "◀ ก่อนหน้า",
+        "next_btn": "ถัดไป ▶",
+        "general_page": "🔧 ทั่วไป",
+        "roles_page": "🎭 บทบาท",
+        "lists_page": "📋 รายการ",
+        "permissions_page": "🔑 สิทธิ์",
+        "language_section": "🌐 ภาษา",
+        "currency_section": "💰 สกุลเงิน",
+        "ann_channels_section": "📢 ช่องทางประกาศ",
+        "configure_btn": "ตั้งค่า",
+        "currency_name_field": "ชื่อสกุลเงิน",
+        "currency_emoji_field": "อิโมจิ (ไม่บังคับ)",
+        "currency_img_field": "URL รูปภาพ (ไม่บังคับ)",
+        "announcement_title": "📢 การประกาศ",
+        "create_draft_btn": "สร้างร่างประกาศ",
+        "no_drafts": "ยังไม่มีร่างประกาศ",
+        "draft_name_field": "ชื่อประกาศ",
+        "draft_created": "✅ สร้างร่างประกาศ **{name}** แล้ว",
+        "edit_title_btn": "แก้ไขชื่อเรื่อง",
+        "edit_content_btn": "แก้ไขเนื้อหา",
+        "publish_btn": "🚀 เผยแพร่",
+        "delete_draft_btn": "🗑️ ลบ",
+        "ann_title_field": "ชื่อเรื่อง",
+        "ann_content_field": "เนื้อหา",
+        "ann_published": "📢 เผยแพร่แล้ว!",
+        "no_ann_channels": "❌ ยังไม่ได้ตั้งค่าช่องทางประกาศ ใช้ /config หน้า 1 เพื่อตั้งค่า",
+        "ann_no_permission": "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้",
+        "ann_permitted_roles_section": "🔑 สิทธิ์ใช้คำสั่งประกาศ",
+        "shop_title": "🏪 ร้านค้า",
+        "shop_setup_title": "ตั้งค่าร้านค้าใหม่",
+        "shop_config_title": "จัดการร้านค้า",
+        "no_shops": "ยังไม่มีร้านค้า",
+        "shop_name_field": "ชื่อร้านค้า",
+        "shop_owner_field": "เจ้าของร้าน",
+        "shop_desc_field": "คำอธิบายร้านค้า",
+        "style_channel": "ช่องข้อความ",
+        "style_thread": "เธรด",
+        "style_forum": "ฟอรัม",
+        "shop_created": "✅ สร้างร้านค้า **{name}** แล้ว",
+        "shop_img_field": "URL รูปภาพ (ไม่บังคับ)",
+        "out_of_stock_label": "หมดสต็อก",
+        "purchase_success": "✅ ซื้อ **{item}** สำเร็จ ราคา **{price}** คงเหลือ **{balance}**",
+        "insufficient_funds": "❌ เงินไม่เพียงพอ ต้องการ **{price}** มี **{balance}**",
+        "balance_title": "💰 ยอดเงิน",
+        "your_balance_label": "ยอดเงินของคุณ",
+        "shop_item_name_field": "ชื่อสินค้า",
+        "shop_item_price_field": "ราคา",
+        "shop_item_desc_field": "คำอธิบาย",
+        "shop_item_cat_field": "หมวดหมู่",
+        "shop_item_stock_field": "สต็อก (-1 = ไม่จำกัด)",
+        "shop_item_restock_field": "รีสต็อกทุก (นาที, 0 = ไม่รีสต็อก)",
+        "items_title": "📦 รายการไอเทม",
+        "item_when_use_field": "ข้อความเมื่อใช้ (ว่าง = ใช้ไม่ได้)",
+        "item_image_field": "URL รูปภาพ (ไม่บังคับ)",
+        "material_tag": "📦 วัสดุ",
+        "usable_tag": "✅ ใช้ได้",
+        "shifter_admin_title": "⚙️ แผงแอดมินผู้แปลงร่าง",
+        "grant_btn": "ให้สิทธิ์",
+        "revoke_btn": "เพิกถอน",
+        "tracker_btn": "ติดตาม",
+        "set_time_btn": "ตั้งเวลา",
+        "buy_btn": "🛒 ซื้อ",
+        "buy_confirm": "ยืนยันการซื้อ **{item}** ราคา **{price}** หรือไม่?",
+        "confirm_btn2": "✅ ยืนยัน",
+        "cancel_btn": "❌ ยกเลิก",
+        "restock_label": "เติมสต็อก: {interval}",
+        "unlimited_stock": "ไม่จำกัด",
+        "shop_channel_set": "เลือกช่องทาง",
+        "add_image_btn": "เพิ่มรูปภาพ",
     },
     "en": {
         "profile_title": "Character Profile",
@@ -215,6 +291,77 @@ LANG = {
         "item_used_msg": "✅ You used **{item}**.",
         "item_given_msg": "🎁 **{sender}** sent you **{item}**!",
         "item_sold_msg": "💰 You sold **{item}** for **{price}** coins. Balance: **{balance}** coins.",
+        "config_title": "Configuration",
+        "config_page": "Page {page}/{total}",
+        "prev_btn": "◀ Prev",
+        "next_btn": "Next ▶",
+        "general_page": "🔧 General",
+        "roles_page": "🎭 Roles",
+        "lists_page": "📋 Lists",
+        "permissions_page": "🔑 Permissions",
+        "language_section": "🌐 Language",
+        "currency_section": "💰 Currency",
+        "ann_channels_section": "📢 Announcement Channels",
+        "configure_btn": "Configure",
+        "currency_name_field": "Currency Name",
+        "currency_emoji_field": "Emoji (optional)",
+        "currency_img_field": "Image URL (optional)",
+        "announcement_title": "📢 Announcements",
+        "create_draft_btn": "Create Draft",
+        "no_drafts": "No drafts yet.",
+        "draft_name_field": "Announcement Name",
+        "draft_created": "✅ Draft **{name}** created.",
+        "edit_title_btn": "Edit Title",
+        "edit_content_btn": "Edit Content",
+        "publish_btn": "🚀 Publish",
+        "delete_draft_btn": "🗑️ Delete",
+        "ann_title_field": "Title",
+        "ann_content_field": "Content",
+        "ann_published": "📢 Published!",
+        "no_ann_channels": "❌ No announcement channels configured. Use /config page 1 to set them.",
+        "ann_no_permission": "❌ You don't have permission to use this command.",
+        "ann_permitted_roles_section": "🔑 Announcement Permissions",
+        "shop_title": "🏪 Shop",
+        "shop_setup_title": "Setup New Shop",
+        "shop_config_title": "Shop Config",
+        "no_shops": "No shops yet.",
+        "shop_name_field": "Shop Name",
+        "shop_owner_field": "Owner",
+        "shop_desc_field": "Shop Description",
+        "style_channel": "Channel",
+        "style_thread": "Thread",
+        "style_forum": "Forum",
+        "shop_created": "✅ Shop **{name}** created.",
+        "shop_img_field": "Image URL (optional)",
+        "out_of_stock_label": "Out of Stock",
+        "purchase_success": "✅ Purchased **{item}** for **{price}**. Balance: **{balance}**",
+        "insufficient_funds": "❌ Insufficient funds. Need **{price}**, have **{balance}**.",
+        "balance_title": "💰 Balance",
+        "your_balance_label": "Your Balance",
+        "shop_item_name_field": "Item Name",
+        "shop_item_price_field": "Price",
+        "shop_item_desc_field": "Description",
+        "shop_item_cat_field": "Category",
+        "shop_item_stock_field": "Stock (-1 = unlimited)",
+        "shop_item_restock_field": "Restock every (min, 0 = never)",
+        "items_title": "📦 Item List",
+        "item_when_use_field": "When Used Message (empty = material item)",
+        "item_image_field": "Image URL (optional)",
+        "material_tag": "📦 Material",
+        "usable_tag": "✅ Usable",
+        "shifter_admin_title": "⚙️ Shifter Admin Panel",
+        "grant_btn": "Grant",
+        "revoke_btn": "Revoke",
+        "tracker_btn": "Tracker",
+        "set_time_btn": "Set Time",
+        "buy_btn": "🛒 Buy",
+        "buy_confirm": "Confirm purchasing **{item}** for **{price}**?",
+        "confirm_btn2": "✅ Confirm",
+        "cancel_btn": "❌ Cancel",
+        "restock_label": "Restock: {interval}",
+        "unlimited_stock": "Unlimited",
+        "shop_channel_set": "Select Channel",
+        "add_image_btn": "Add Image",
     },
 }
 
@@ -278,6 +425,18 @@ def load_items(guild_id: int) -> dict:
 
 def save_items(guild_id: int, data: dict):
     _save_json(DATA_DIR / f"items_{guild_id}.json", data)
+
+def load_announcements(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"announcements_{guild_id}.json", lambda: {"drafts": {}})
+
+def save_announcements(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"announcements_{guild_id}.json", data)
+
+def load_shops(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"shops_{guild_id}.json", lambda: {"shops": {}})
+
+def save_shops(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"shops_{guild_id}.json", data)
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
@@ -345,6 +504,13 @@ async def remove_old_roles(member: _discord.Member, old: dict, cfg: dict):
 
 
 # ── Profile text ──────────────────────────────────────────────────────────────
+
+def format_currency(amount: int, cfg: dict) -> str:
+    name  = cfg.get("currency_name", "Coins")
+    emoji = cfg.get("currency_emoji", "").strip()
+    prefix = f"{emoji} " if emoji else ""
+    return f"{prefix}{amount} {name}"
+
 
 def format_profile_text(player: dict, display_name: str, guild_id: int) -> str:
     rank = player.get("rank", "?")
