@@ -20,6 +20,7 @@ import aot_profile   # registers /profile
 import aot_admin     # registers /admin
 import aot_items     # registers /item-admin
 import aot_shifter   # registers background tasks
+import aot_set       # registers /set profile, /set banner
 
 import discord
 

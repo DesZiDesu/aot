@@ -1,12 +1,13 @@
-"""Item admin panel — categories, items, give/remove."""
+"""Item admin panel — categories, items, give/remove; player inventory."""
 import discord
 from discord import app_commands
-from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput
+from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput, MediaGallery
+from discord.components import MediaGalleryItem
 
 from aot_bot_instance import bot
 from aot_shared import (
     t, load_players, save_players, load_items, save_items,
-    select_options_from_list, slugify, is_url,
+    select_options_from_list, slugify, is_url, cv2_dm,
 )
 
 
@@ -180,11 +181,11 @@ class CategoriesView(LayoutView):
 # ── Create / Edit Item ────────────────────────────────────────────────────────
 
 class CreateItemModal(Modal, title="Create Item"):
-    f_name  = TextInput(label="Item Name",            max_length=60)
-    f_cat   = TextInput(label="Category name or ID",  max_length=60,  required=False)
-    f_desc  = TextInput(label="Description",          style=discord.TextStyle.paragraph, max_length=400, required=False)
-    f_emoji = TextInput(label="Emoji (optional)",     max_length=20,  required=False)
-    f_img   = TextInput(label="Image URL (optional)", max_length=400, required=False)
+    f_name  = TextInput(label="Item Name",           max_length=60)
+    f_cat   = TextInput(label="Category name or ID", max_length=60,  required=False)
+    f_desc  = TextInput(label="Description",         style=discord.TextStyle.paragraph, max_length=400, required=False)
+    f_emoji = TextInput(label="Emoji (optional)",    max_length=20,  required=False)
+    f_price = TextInput(label="Sell Price",          max_length=10,  required=False, default="0")
 
     def __init__(self, gid, item_id, parent, prefill=None):
         super().__init__()
@@ -194,7 +195,7 @@ class CreateItemModal(Modal, title="Create Item"):
             self.f_cat.default   = prefill.get("category", "")
             self.f_desc.default  = prefill.get("description", "")
             self.f_emoji.default = prefill.get("emoji", "")
-            self.f_img.default   = prefill.get("image_url", "")
+            self.f_price.default = str(prefill.get("sell_price", 0))
 
     async def on_submit(self, ix):
         name   = (self.f_name.value or "").strip()
@@ -206,13 +207,17 @@ class CreateItemModal(Modal, title="Create Item"):
         iid = self.item_id or slugify(name)
         if not iid:
             await ix.response.send_message("Invalid name.", ephemeral=True); return
+        try:
+            sell_price = max(0, int((self.f_price.value or "0").strip()))
+        except ValueError:
+            sell_price = db.get("items", {}).get(iid, {}).get("sell_price", 0)
         db.setdefault("items", {})[iid] = {
             "name":        name,
             "category":    cat_id,
             "description": (self.f_desc.value or "").strip(),
             "emoji":       (self.f_emoji.value or "📦").strip() or "📦",
-            "image_url":   (self.f_img.value or "").strip(),
-            "sell_price":  db.get("items", {}).get(iid, {}).get("sell_price", 0),
+            "image_url":   db.get("items", {}).get(iid, {}).get("image_url", ""),
+            "sell_price":  sell_price,
         }
         save_items(self.gid, db)
         self.parent._build()
@@ -428,6 +433,254 @@ class GiveRemoveView(LayoutView):
     async def _back(self, ix):
         self.parent._build()
         await ix.response.edit_message(view=self.parent)
+
+
+# ── Player InventoryView ──────────────────────────────────────────────────────
+
+class InventoryView(LayoutView):
+    def __init__(self, uid: int, gid: int, back_view=None):
+        super().__init__(timeout=300)
+        self.uid = uid; self.gid = gid; self.back_view = back_view
+        self.sel_cat = None; self.sel_item_id = None
+        self._build_categories()
+
+    def _build_categories(self):
+        self.clear_items()
+        player = load_players(self.gid).get(str(self.uid), {})
+        items_db = load_items(self.gid)
+        inventory = player.get("inventory", {})
+        all_items = items_db.get("items", {})
+        categories = items_db.get("categories", {})
+        cat_order = items_db.get("category_order", [])
+
+        player_cats: set = set()
+        for iid, qty in inventory.items():
+            if qty > 0 and iid in all_items:
+                cat_id = all_items[iid].get("category", "")
+                player_cats.add(cat_id if cat_id else "__uncategorized__")
+
+        bk = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="inv_bk")
+        bk.callback = self._back
+
+        if not player_cats:
+            self.add_item(Container(
+                TextDisplay(f"**🎒 {t(self.gid,'inventory_btn')}**\n\n{t(self.gid,'inventory_empty')}"),
+                Separator(),
+                ActionRow(bk),
+            ))
+            return
+
+        opts = []
+        for cat_id in cat_order:
+            if cat_id in player_cats and cat_id in categories:
+                cat = categories[cat_id]
+                opts.append(discord.SelectOption(
+                    label=f"{cat.get('emoji','📦')} {cat.get('name', cat_id)}",
+                    value=cat_id,
+                    default=(cat_id == self.sel_cat),
+                ))
+        if "__uncategorized__" in player_cats:
+            opts.append(discord.SelectOption(label="📦 Other", value="__uncategorized__",
+                                              default=("__uncategorized__" == self.sel_cat)))
+        if not opts:
+            opts = [discord.SelectOption(label="—", value="__none__")]
+
+        sel = Select(placeholder="Select category", options=opts[:25])
+        sel.callback = self._cat_cb
+        self.add_item(Container(
+            TextDisplay(f"**🎒 {t(self.gid,'inventory_btn')}**\n\nSelect a category:"),
+            Separator(),
+            ActionRow(sel),
+            ActionRow(bk),
+        ))
+
+    async def _cat_cb(self, ix):
+        v = ix.data["values"][0]
+        if v == "__none__": await ix.response.defer(); return
+        self.sel_cat = v
+        self._build_items()
+        await ix.response.edit_message(view=self)
+
+    def _build_items(self):
+        self.clear_items()
+        player = load_players(self.gid).get(str(self.uid), {})
+        items_db = load_items(self.gid)
+        inventory = player.get("inventory", {})
+        all_items = items_db.get("items", {})
+        categories = items_db.get("categories", {})
+
+        cat_name = "Other"
+        if self.sel_cat and self.sel_cat != "__uncategorized__":
+            cat_name = categories.get(self.sel_cat, {}).get("name", self.sel_cat)
+
+        opts = []
+        for iid, qty in inventory.items():
+            if qty <= 0 or iid not in all_items: continue
+            item = all_items[iid]
+            item_cat = item.get("category", "")
+            if self.sel_cat == "__uncategorized__":
+                if item_cat: continue
+            elif item_cat != self.sel_cat:
+                continue
+            opts.append(discord.SelectOption(
+                label=f"{item.get('emoji','📦')} {item.get('name', iid)} ×{qty}",
+                value=iid,
+                default=(iid == self.sel_item_id),
+            ))
+        if not opts:
+            opts = [discord.SelectOption(label="—", value="__none__")]
+
+        sel = Select(placeholder="Select item", options=opts[:25])
+        sel.callback = self._item_cb
+        bk = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="inv_bk2")
+        bk.callback = self._back_to_cats
+        self.add_item(Container(
+            TextDisplay(f"**🎒 {cat_name}**\n\nSelect an item:"),
+            Separator(),
+            ActionRow(sel),
+            ActionRow(bk),
+        ))
+
+    async def _item_cb(self, ix):
+        v = ix.data["values"][0]
+        if v == "__none__": await ix.response.defer(); return
+        self.sel_item_id = v
+        self._build_item_detail()
+        await ix.response.edit_message(view=self)
+
+    def _build_item_detail(self):
+        self.clear_items()
+        player = load_players(self.gid).get(str(self.uid), {})
+        items_db = load_items(self.gid)
+        item = items_db.get("items", {}).get(self.sel_item_id, {})
+        inventory = player.get("inventory", {})
+
+        name = item.get("name", self.sel_item_id)
+        emoji = item.get("emoji", "📦")
+        desc = item.get("description", "")
+        sell_price = item.get("sell_price", 0)
+        img_url = item.get("image_url", "")
+        qty = inventory.get(self.sel_item_id, 0)
+
+        text_lines = [f"**{emoji} {name}** ×{qty}", ""]
+        if desc:
+            text_lines += [f"*{desc}*", ""]
+        if sell_price:
+            text_lines.append(f"**{t(self.gid,'balance_label')}:** {sell_price} per item")
+
+        use_btn  = Button(label="✅ Use",                   style=discord.ButtonStyle.green,     custom_id="inv_use")
+        give_btn = Button(label="🎁 Give",                  style=discord.ButtonStyle.primary,   custom_id="inv_give")
+        sell_btn = Button(label=f"💰 Sell ({sell_price})",  style=discord.ButtonStyle.secondary, custom_id="inv_sell")
+        bk_btn   = Button(label=t(self.gid, "back_btn"),   style=discord.ButtonStyle.secondary, custom_id="inv_bk3")
+        use_btn.callback  = self._use
+        give_btn.callback = self._give
+        sell_btn.callback = self._sell
+        bk_btn.callback   = self._back_to_items
+
+        container_children = [TextDisplay("\n".join(text_lines)), Separator()]
+        if img_url and is_url(img_url):
+            container_children.append(MediaGallery(MediaGalleryItem(media=img_url)))
+            container_children.append(Separator())
+        container_children.append(ActionRow(use_btn, give_btn, sell_btn))
+        container_children.append(ActionRow(bk_btn))
+        self.add_item(Container(*container_children))
+
+    async def _use(self, ix: discord.Interaction):
+        if ix.user.id != self.uid:
+            await ix.response.send_message(t(self.gid, "not_your_profile"), ephemeral=True); return
+        players = load_players(self.gid)
+        player = players.get(str(self.uid), {})
+        inv = player.setdefault("inventory", {})
+        qty = inv.get(self.sel_item_id, 0)
+        if qty <= 0:
+            await ix.response.send_message("You don't have this item.", ephemeral=True); return
+        inv[self.sel_item_id] = qty - 1
+        players[str(self.uid)] = player
+        save_players(self.gid, players)
+        item_name = load_items(self.gid).get("items", {}).get(self.sel_item_id, {}).get("name", self.sel_item_id)
+        await cv2_dm(ix.user, t(self.gid, "item_used_msg", item=item_name))
+        self._build_categories()
+        await ix.response.edit_message(view=self)
+
+    async def _give(self, ix: discord.Interaction):
+        if ix.user.id != self.uid:
+            await ix.response.send_message(t(self.gid, "not_your_profile"), ephemeral=True); return
+        self.clear_items()
+        us = discord.ui.UserSelect(placeholder="Select recipient", min_values=1, max_values=1)
+        us.callback = self._do_give
+        bk = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="inv_bk_give")
+        bk.callback = self._back_to_items
+        self.add_item(Container(
+            TextDisplay("**🎁 Give Item**\n\nSelect a recipient:"),
+            Separator(),
+            ActionRow(us),
+            ActionRow(bk),
+        ))
+        await ix.response.edit_message(view=self)
+
+    async def _do_give(self, ix: discord.Interaction):
+        if not ix.data.get("values"):
+            await ix.response.defer(); return
+        recipient_id = ix.data["values"][0]
+        players = load_players(self.gid)
+        giver = players.get(str(self.uid), {})
+        inv = giver.setdefault("inventory", {})
+        qty = inv.get(self.sel_item_id, 0)
+        if qty <= 0:
+            await ix.response.send_message("You don't have this item.", ephemeral=True); return
+        inv[self.sel_item_id] = qty - 1
+        recipient = players.setdefault(recipient_id, {"inventory": {}})
+        rec_inv = recipient.setdefault("inventory", {})
+        rec_inv[self.sel_item_id] = rec_inv.get(self.sel_item_id, 0) + 1
+        players[str(self.uid)] = giver
+        players[recipient_id]  = recipient
+        save_players(self.gid, players)
+        item_name = load_items(self.gid).get("items", {}).get(self.sel_item_id, {}).get("name", self.sel_item_id)
+        try:
+            from aot_bot_instance import bot as _bot
+            rec_user = await _bot.fetch_user(int(recipient_id))
+            await cv2_dm(rec_user, t(self.gid, "item_given_msg", sender=ix.user.display_name, item=item_name))
+        except Exception:
+            pass
+        self._build_categories()
+        await ix.response.edit_message(view=self)
+
+    async def _sell(self, ix: discord.Interaction):
+        if ix.user.id != self.uid:
+            await ix.response.send_message(t(self.gid, "not_your_profile"), ephemeral=True); return
+        players = load_players(self.gid)
+        player = players.get(str(self.uid), {})
+        inv = player.setdefault("inventory", {})
+        qty = inv.get(self.sel_item_id, 0)
+        if qty <= 0:
+            await ix.response.send_message("You don't have this item.", ephemeral=True); return
+        item = load_items(self.gid).get("items", {}).get(self.sel_item_id, {})
+        sell_price = item.get("sell_price", 0)
+        item_name  = item.get("name", self.sel_item_id)
+        inv[self.sel_item_id] = qty - 1
+        player["balance"] = player.get("balance", 0) + sell_price
+        players[str(self.uid)] = player
+        save_players(self.gid, players)
+        await cv2_dm(ix.user, t(self.gid, "item_sold_msg", item=item_name, price=sell_price, balance=player["balance"]))
+        self._build_categories()
+        await ix.response.edit_message(view=self)
+
+    async def _back(self, ix):
+        if self.back_view:
+            self.back_view._build()
+            await ix.response.edit_message(view=self.back_view)
+        else:
+            self._build_categories()
+            await ix.response.edit_message(view=self)
+
+    async def _back_to_cats(self, ix):
+        self.sel_item_id = None
+        self._build_categories()
+        await ix.response.edit_message(view=self)
+
+    async def _back_to_items(self, ix):
+        self._build_items()
+        await ix.response.edit_message(view=self)
 
 
 # ── /item-admin ───────────────────────────────────────────────────────────────

@@ -85,7 +85,7 @@ LANG = {
         "item_admin_title": "แผงจัดการไอเทม",
         "inventory_empty": "กระเป๋าว่างเปล่า",
         "titan_died": "⚰️ **{name}** สิ้นชีพแล้ว — พลัง **{titan}** ส่งต่อให้ **{new_owner}**",
-        "got_titan_dm": "⚡ คุณได้รับพลังไททัน **{titan}** แล้ว!\n\nใช้ `/profile` เพื่อดูและจัดการพลังของคุณ",
+        "got_titan_dm": "⚡ คุณได้รับพลังไททัน **{titan}** แล้ว!\n\nใช้ `/shifter` เพื่อดูและจัดการพลังของคุณ",
         "admin_got_titan": "📢 **{new_owner}** ได้รับพลัง **{titan}** ต่อจาก **{old_owner}**",
         "no_permission": "❌ คุณไม่มีสิทธิ์",
         "admin_only": "❌ ต้องเป็นแอดมิน",
@@ -118,6 +118,11 @@ LANG = {
         "language_th": "🇹🇭 ภาษาไทย",
         "language_en": "🇬🇧 English",
         "language_set": "✅ ตั้งภาษาเป็น {lang} แล้ว",
+        "balance_label": "เหรียญ",
+        "got_bloodline_dm": "✨ คุณได้รับสิทธิ์สายเลือด **{bloodline}** แล้ว! ใช้ `/profile` เพื่ออัปเดต",
+        "item_used_msg": "✅ คุณใช้ **{item}** แล้ว",
+        "item_given_msg": "🎁 **{sender}** ส่ง **{item}** ให้คุณ!",
+        "item_sold_msg": "💰 คุณขาย **{item}** ได้ **{price}** เหรียญ ยอดรวม: **{balance}** เหรียญ",
     },
     "en": {
         "profile_title": "Character Profile",
@@ -172,7 +177,7 @@ LANG = {
         "item_admin_title": "Item Admin Panel",
         "inventory_empty": "Empty",
         "titan_died": "⚰️ **{name}** has perished — **{titan}** passed to **{new_owner}**",
-        "got_titan_dm": "⚡ You received the **{titan}** power!\n\nUse `/profile` to manage it.",
+        "got_titan_dm": "⚡ You received the **{titan}** power!\n\nUse `/shifter` to manage it.",
         "admin_got_titan": "📢 **{new_owner}** received **{titan}** from **{old_owner}**",
         "no_permission": "❌ You don't have permission.",
         "admin_only": "❌ Administrator only.",
@@ -205,6 +210,11 @@ LANG = {
         "language_th": "🇹🇭 Thai",
         "language_en": "🇬🇧 English",
         "language_set": "✅ Language set to {lang}.",
+        "balance_label": "Coins",
+        "got_bloodline_dm": "✨ You've been granted **{bloodline}** bloodline access! Use `/profile` to update.",
+        "item_used_msg": "✅ You used **{item}**.",
+        "item_given_msg": "🎁 **{sender}** sent you **{item}**!",
+        "item_sold_msg": "💰 You sold **{item}** for **{price}** coins. Balance: **{balance}** coins.",
     },
 }
 
@@ -214,6 +224,17 @@ def t(guild_id: int, key: str, **kwargs) -> str:
     lang = cfg.get("language", "th")
     text = LANG.get(lang, LANG["th"]).get(key) or LANG["en"].get(key, key)
     return text.format(**kwargs) if kwargs else text
+
+
+async def cv2_dm(user, text: str) -> None:
+    try:
+        import discord as _d
+        v = _d.ui.LayoutView(timeout=None)
+        v.add_item(_d.ui.Container(_d.ui.TextDisplay(text)))
+        dm = await user.create_dm()
+        await dm.send(view=v)
+    except Exception:
+        pass
 
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
@@ -327,27 +348,7 @@ async def remove_old_roles(member: _discord.Member, old: dict, cfg: dict):
 
 def format_profile_text(player: dict, display_name: str, guild_id: int) -> str:
     rank = player.get("rank", "?")
-    emblem = RANK_EMBLEMS.get(rank, "")
-    rank_str = f"{rank} [🛡️]({emblem})" if emblem else rank
-
-    titan_info = ""
-    powers = player.get("titan_powers", [])
-    if powers:
-        import time as _time
-        now = _time.time()
-        first_exp = powers[0].get("expires_at", 0)
-        secs_left = max(0, int(first_exp - now))
-        days_left = secs_left // 86400
-        titan_names = ", ".join(p["titan"] for p in powers)
-        titan_info = f"\n**{t(guild_id, 'shifter_label')}** — {titan_names}\n**{t(guild_id, 'time_left_label')}** — {days_left}d"
-
-    stamina = player.get("stamina", 100)
-    max_st = player.get("max_stamina", 100)
-    filled = int((stamina / max_st) * 10) if max_st else 0
-    bar = "▓" * filled + "░" * (10 - filled)
-
-    img = player.get("image", "").strip()
-    img_line = f"\n[🖼️ Character Image]({img})" if img and is_url(img) else (f"\n{img}" if img else "")
+    balance = player.get("balance", 0)
 
     lines = [
         f"**{t(guild_id,'name_label')}** — {player.get('name','?')}",
@@ -355,18 +356,15 @@ def format_profile_text(player: dict, display_name: str, guild_id: int) -> str:
         f"**{t(guild_id,'gender_label')}** — {player.get('gender','?')}",
         f"**{t(guild_id,'bloodline_label')}** — {player.get('bloodline','?')}",
         f"**{t(guild_id,'faction_label')}** — {player.get('faction','?')}",
-        f"**{t(guild_id,'rank_label')}** — {rank_str}",
-        f"**{t(guild_id,'stamina_label')}** — {bar} {stamina}/{max_st}",
+        f"**{t(guild_id,'rank_label')}** — {rank}",
     ]
-    if titan_info:
-        lines.append(titan_info.strip())
+    if balance > 0:
+        lines.append(f"**{t(guild_id,'balance_label')}** — {balance}")
     lines += [
         "",
         f"**{t(guild_id,'appearance_label')}**",
         f"*{player.get('appearance','?')}*",
     ]
-    if img_line:
-        lines.append(img_line.strip())
 
     return f"**📋 {t(guild_id,'profile_title')} — {display_name}**\n\n" + "\n".join(lines)
 

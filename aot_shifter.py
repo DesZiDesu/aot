@@ -1,5 +1,5 @@
-"""Shifter system — transform, abilities, moveset, stamina, 13-year timer."""
-import time, uuid, asyncio
+"""Shifter system — /shifter command, abilities, moveset, stamina, 13-year timer."""
+import time, uuid
 import discord
 from discord.ext import tasks
 from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput
@@ -7,7 +7,7 @@ from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow,
 from aot_bot_instance import bot
 from aot_shared import (
     t, load_players, save_players, load_config, save_config,
-    select_options_from_list,
+    select_options_from_list, has_shifter_access, cv2_dm,
 )
 
 
@@ -62,13 +62,46 @@ def _abilities_text(gid, player, titan_name, power):
     return "\n".join(lines)
 
 
-# ── Transform View ────────────────────────────────────────────────────────────
+# ── Admin stamina notification ────────────────────────────────────────────────
 
-class TransformView(LayoutView):
-    def __init__(self, uid: int, gid: int, profile_view):
+async def _notify_admins_stamina(guild, uid, player, gid):
+    if not guild: return
+    member = guild.get_member(int(uid))
+    name   = member.display_name if member else str(uid)
+    msg    = t(gid, "admin_stamina_warn", name=name,
+               stamina=player.get("stamina", 0), max=player.get("max_stamina", 100))
+    for m in guild.members:
+        if m.guild_permissions.administrator:
+            await cv2_dm(m, msg)
+
+
+# ── /shifter command ──────────────────────────────────────────────────────────
+
+@bot.tree.command(name="shifter", description="Titan shifter panel")
+async def shifter_cmd(ix: discord.Interaction):
+    gid = ix.guild_id; uid = ix.user.id
+    if not has_shifter_access(gid, uid):
+        v = LayoutView(timeout=60)
+        v.add_item(Container(TextDisplay(t(gid, "no_permission"))))
+        await ix.response.send_message(view=v, ephemeral=True)
+        return
+    players = load_players(gid)
+    player  = players.get(str(uid), {})
+    if not player.get("titan_powers"):
+        v = LayoutView(timeout=60)
+        v.add_item(Container(TextDisplay(t(gid, "no_titan_power"))))
+        await ix.response.send_message(view=v, ephemeral=True)
+        return
+    await ix.response.send_message(view=ShifterMainView(uid, gid), ephemeral=True)
+
+
+# ── ShifterMainView ───────────────────────────────────────────────────────────
+
+class ShifterMainView(LayoutView):
+    def __init__(self, uid: int, gid: int):
         super().__init__(timeout=300)
-        self.uid = uid; self.gid = gid; self.profile_view = profile_view
-        self.hide_name = False; self.sel_titan = None
+        self.uid = uid; self.gid = gid
+        self.hide_name = False; self.sel_titan = None; self.sel_ability = None
         self._build()
 
     def _build(self):
@@ -77,44 +110,123 @@ class TransformView(LayoutView):
         player  = players.get(str(self.uid), {})
         powers  = player.get("titan_powers", [])
 
-        opts = ([discord.SelectOption(label=p["titan"], value=p["titan"]) for p in powers]
-                or [discord.SelectOption(label="—", value="__none__")])
-        sel = Select(placeholder="Select Titan form", options=opts)
-        sel.callback = self._titan_cb
+        if not powers:
+            self.add_item(Container(TextDisplay(t(self.gid, "no_titan_power"))))
+            return
 
-        hide_lbl = t(self.gid, "show_username_btn") if self.hide_name else t(self.gid, "hide_username_btn")
-        hb = Button(label=hide_lbl,    style=discord.ButtonStyle.secondary, custom_id="tv_hide")
-        tb = Button(label="⚔️ Transform!", style=discord.ButtonStyle.danger,  custom_id="tv_transform")
-        bb = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="tv_back")
-        hb.callback = self._toggle_hide
-        tb.callback = self._do_transform
-        bb.callback = self._back
+        if not self.sel_titan or not any(p["titan"] == self.sel_titan for p in powers):
+            self.sel_titan = powers[0]["titan"]
+
+        power = next((p for p in powers if p["titan"] == self.sel_titan), powers[0])
+
+        if player.get("transformed"):
+            self._build_transformed(player, power)
+        else:
+            self._build_untransformed(player, power)
+
+    def _build_untransformed(self, player, power):
+        gid        = self.gid
+        powers     = player.get("titan_powers", [])
+        titan_name = power.get("titan", "?")
+        stamina    = player.get("stamina", 100)
+        max_st     = player.get("max_stamina", 100)
+        bar        = _stamina_bar(stamina, max_st)
+        now        = time.time()
+        days_left  = max(0, int((power.get("expires_at", 0) - now) / 86400))
+
+        text = "\n".join([
+            f"**⚔️ {titan_name}**",
+            "",
+            f"**{t(gid,'stamina_label')}** — {bar}",
+            f"**{t(gid,'time_left_label')}** — {days_left}d",
+        ])
+
+        container_children = [TextDisplay(text), Separator()]
+
+        if len(powers) > 1:
+            opts = [discord.SelectOption(label=p["titan"], value=p["titan"],
+                                          default=(p["titan"] == titan_name)) for p in powers]
+            ts = Select(placeholder="Select Titan form", options=opts)
+            ts.callback = self._titan_cb
+            container_children.append(ActionRow(ts))
+
+        hide_lbl    = t(gid, "show_username_btn") if self.hide_name else t(gid, "hide_username_btn")
+        hide_btn    = Button(label=hide_lbl,                   style=discord.ButtonStyle.secondary, custom_id="sh_hide")
+        transform_b = Button(label="⚔️ Transform!",            style=discord.ButtonStyle.danger,    custom_id="sh_transform")
+        moveset_b   = Button(label=t(gid, "edit_moveset_btn"), style=discord.ButtonStyle.secondary, custom_id="sh_moveset")
+        refresh_b   = Button(label="🔄 Refresh",               style=discord.ButtonStyle.secondary, custom_id="sh_refresh")
+        hide_btn.callback    = self._toggle_hide
+        transform_b.callback = self._transform
+        moveset_b.callback   = self._open_moveset
+        refresh_b.callback   = self._refresh
+
+        container_children.append(ActionRow(hide_btn, transform_b))
+        container_children.append(ActionRow(moveset_b, refresh_b))
+        self.add_item(Container(*container_children))
+
+    def _build_transformed(self, player, power):
+        gid        = self.gid
+        titan_name = power.get("titan", "?")
+        abilities  = power.get("abilities", [])
+        text       = _abilities_text(gid, player, titan_name, power)
+
+        opts = ([discord.SelectOption(
+                    label=ab["name"][:100], value=ab["name"],
+                    description=f"Cost:{ab.get('stamina_cost',0)} CD:{ab.get('cooldown_minutes',0)}m"[:100],
+                    default=(ab["name"] == self.sel_ability))
+                 for ab in abilities[:25]]
+                or [discord.SelectOption(label="No abilities", value="__none__")])
+
+        sel = Select(placeholder="Select ability", options=opts)
+        sel.callback = self._sel_ab
+
+        use_b     = Button(label=t(gid, "use_ability_btn"),  style=discord.ButtonStyle.danger,    custom_id="sh_use")
+        moveset_b = Button(label=t(gid, "edit_moveset_btn"), style=discord.ButtonStyle.secondary, custom_id="sh_moveset2")
+        deform_b  = Button(label=t(gid, "detransform_btn"),  style=discord.ButtonStyle.secondary, custom_id="sh_deform")
+        refresh_b = Button(label="🔄 Refresh",               style=discord.ButtonStyle.secondary, custom_id="sh_refresh2")
+        use_b.callback     = self._use
+        moveset_b.callback = self._open_moveset
+        deform_b.callback  = self._deform
+        refresh_b.callback = self._refresh
 
         self.add_item(Container(
-            TextDisplay(f"**{t(self.gid,'transform_btn')}**\n\nSelect your Titan form to transform."),
+            TextDisplay(text),
             Separator(),
             ActionRow(sel),
-            ActionRow(hb, tb),
-            ActionRow(bb),
+            ActionRow(use_b, moveset_b),
+            ActionRow(deform_b, refresh_b),
         ))
 
     async def _titan_cb(self, ix):
-        self.sel_titan = ix.data["values"][0]; self._build()
+        self.sel_titan   = ix.data["values"][0]
+        self.sel_ability = None
+        self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _sel_ab(self, ix):
+        self.sel_ability = ix.data["values"][0]
+        self._build()
         await ix.response.edit_message(view=self)
 
     async def _toggle_hide(self, ix):
-        self.hide_name = not self.hide_name; self._build()
+        self.hide_name = not self.hide_name
+        self._build()
         await ix.response.edit_message(view=self)
 
-    async def _do_transform(self, ix: discord.Interaction):
-        if not self.sel_titan or self.sel_titan == "__none__":
-            await ix.response.send_message("Select a Titan form first.", ephemeral=True); return
+    async def _refresh(self, ix):
+        self._build()
+        await ix.response.edit_message(view=self)
 
+    async def _transform(self, ix: discord.Interaction):
         players = load_players(self.gid); player = players.get(str(self.uid), {})
         cfg = load_config(self.gid); player = _regen_stamina(player, cfg)
 
         if player.get("stamina", 100) < 10:
             await ix.response.send_message(t(self.gid, "stamina_low"), ephemeral=True); return
+
+        power = next((p for p in player.get("titan_powers", []) if p["titan"] == self.sel_titan), None)
+        if not power:
+            await ix.response.send_message(t(self.gid, "no_titan_power"), ephemeral=True); return
 
         player["transformed"] = True; players[str(self.uid)] = player; save_players(self.gid, players)
 
@@ -124,63 +236,15 @@ class TransformView(LayoutView):
         try: await ix.channel.send(pub)
         except Exception: pass
 
-        power = next((p for p in player.get("titan_powers", []) if p["titan"] == self.sel_titan), None)
-        await ix.response.edit_message(view=TitanAbilitiesView(self.uid, self.gid, self.sel_titan, power, self.profile_view))
-
-    async def _back(self, ix):
-        self.profile_view.display_name = ix.user.display_name
-        self.profile_view._build()
-        await ix.response.edit_message(view=self.profile_view)
-
-
-# ── Titan Abilities View ──────────────────────────────────────────────────────
-
-class TitanAbilitiesView(LayoutView):
-    def __init__(self, uid, gid, titan_name, power, profile_view):
-        super().__init__(timeout=300)
-        self.uid = uid; self.gid = gid; self.titan_name = titan_name
-        self.power = power or {}; self.profile_view = profile_view
-        self.sel_ability = None
         self._build()
+        await ix.response.edit_message(view=self)
 
-    def _refresh(self):
+    async def _deform(self, ix: discord.Interaction):
         players = load_players(self.gid); player = players.get(str(self.uid), {})
-        power   = next((p for p in player.get("titan_powers", []) if p["titan"] == self.titan_name), self.power)
-        self.power = power
-        return player
-
-    def _build(self):
-        self.clear_items()
-        player    = self._refresh()
-        abilities = self.power.get("abilities", [])
-        opts = ([discord.SelectOption(
-                    label=ab["name"][:100], value=ab["name"],
-                    description=f"Cost:{ab.get('stamina_cost',0)} CD:{ab.get('cooldown_minutes',0)}m"[:100])
-                 for ab in abilities[:25]]
-                or [discord.SelectOption(label="No abilities", value="__none__")])
-
-        sel = Select(placeholder="Select ability", options=opts)
-        sel.callback = self._sel_ab
-
-        use  = Button(label=t(self.gid, "use_ability_btn"),  style=discord.ButtonStyle.danger,    custom_id="ta_use")
-        mov  = Button(label=t(self.gid, "edit_moveset_btn"), style=discord.ButtonStyle.secondary, custom_id="ta_mov")
-        det  = Button(label=t(self.gid, "detransform_btn"),  style=discord.ButtonStyle.secondary, custom_id="ta_det")
-        bk   = Button(label=t(self.gid, "back_btn"),         style=discord.ButtonStyle.secondary, custom_id="ta_bk")
-        use.callback = self._use
-        mov.callback = self._moveset
-        det.callback = self._deform
-        bk.callback  = self._back
-
-        self.add_item(Container(
-            TextDisplay(_abilities_text(self.gid, player, self.titan_name, self.power)),
-            Separator(),
-            ActionRow(sel),
-            ActionRow(use, mov),
-            ActionRow(det, bk),
-        ))
-
-    async def _sel_ab(self, ix):
-        self.sel_ability = ix.data["values"][0]; self._build()
+        player["transformed"] = False; players[str(self.uid)] = player; save_players(self.gid, players)
+        try: await ix.channel.send(t(self.gid, "detransform_public", name=ix.user.display_name))
+        except Exception: pass
+        self._build()
         await ix.response.edit_message(view=self)
 
     async def _use(self, ix: discord.Interaction):
@@ -189,10 +253,13 @@ class TitanAbilitiesView(LayoutView):
 
         players = load_players(self.gid); player = players.get(str(self.uid), {})
         cfg     = load_config(self.gid); player  = _regen_stamina(player, cfg)
-        ability = next((a for a in self.power.get("abilities", []) if a["name"] == self.sel_ability), None)
+        power   = next((p for p in player.get("titan_powers", []) if p["titan"] == self.sel_titan), None)
+        if not power: await ix.response.send_message(t(self.gid, "no_titan_power"), ephemeral=True); return
+
+        ability = next((a for a in power.get("abilities", []) if a["name"] == self.sel_ability), None)
         if not ability: await ix.response.send_message("Ability not found.", ephemeral=True); return
 
-        cd_key    = f"{self.titan_name}:{ability['name']}"
+        cd_key    = f"{self.sel_titan}:{ability['name']}"
         cooldowns = player.get("ability_cooldowns", {})
         now       = time.time()
 
@@ -216,45 +283,18 @@ class TitanAbilitiesView(LayoutView):
 
         if player["stamina"] <= 0:
             player["transformed"] = False; players[str(self.uid)] = player; save_players(self.gid, players)
-            try: await ix.user.send(t(self.gid, "stamina_empty"))
-            except Exception: pass
+            await cv2_dm(ix.user, t(self.gid, "stamina_empty"))
             await _notify_admins_stamina(ix.guild, self.uid, player, self.gid)
-            self.profile_view.display_name = ix.user.display_name
-            self.profile_view._build()
-            await ix.response.edit_message(view=self.profile_view)
-            return
 
         self._build()
         await ix.response.edit_message(view=self)
 
-    async def _moveset(self, ix: discord.Interaction):
-        await ix.response.edit_message(view=MovesetEditorView(self.uid, self.gid, self.titan_name, self.power, self))
-
-    async def _deform(self, ix: discord.Interaction):
+    async def _open_moveset(self, ix: discord.Interaction):
         players = load_players(self.gid); player = players.get(str(self.uid), {})
-        player["transformed"] = False; players[str(self.uid)] = player; save_players(self.gid, players)
-        try: await ix.channel.send(t(self.gid, "detransform_public", name=ix.user.display_name))
-        except Exception: pass
-        self.profile_view.display_name = ix.user.display_name
-        self.profile_view._build()
-        await ix.response.edit_message(view=self.profile_view)
-
-    async def _back(self, ix):
-        self.profile_view.display_name = ix.user.display_name
-        self.profile_view._build()
-        await ix.response.edit_message(view=self.profile_view)
-
-
-async def _notify_admins_stamina(guild, uid, player, gid):
-    if not guild: return
-    member = guild.get_member(int(uid))
-    name   = member.display_name if member else str(uid)
-    msg    = t(gid, "admin_stamina_warn", name=name,
-               stamina=player.get("stamina", 0), max=player.get("max_stamina", 100))
-    for m in guild.members:
-        if m.guild_permissions.administrator:
-            try: await m.send(msg)
-            except Exception: pass
+        power = next((p for p in player.get("titan_powers", []) if p["titan"] == self.sel_titan), None)
+        if not power:
+            await ix.response.send_message(t(self.gid, "no_titan_power"), ephemeral=True); return
+        await ix.response.edit_message(view=MovesetEditorView(self.uid, self.gid, self.sel_titan, power, self))
 
 
 # ── Moveset Editor ────────────────────────────────────────────────────────────
@@ -318,7 +358,8 @@ class MovesetEditorView(LayoutView):
     async def _back(self, ix):
         players = load_players(self.gid); player = players.get(str(self.uid), {})
         power   = next((p for p in player.get("titan_powers", []) if p["titan"] == self.titan_name), self.power)
-        self.parent.power = power
+        if hasattr(self.parent, "power"):
+            self.parent.power = power
         self.parent._build()
         await ix.response.edit_message(view=self.parent)
 
@@ -350,9 +391,11 @@ class EditAbilityModal(Modal, title="Edit Ability"):
             await _apply_ability_edit(self.uid, self.gid, self.titan_name, ability, self.is_new, self.prefill.get("name", ""))
             players = load_players(self.gid); player = players.get(str(self.uid), {})
             power   = next((p for p in player.get("titan_powers", []) if p["titan"] == self.titan_name), self.power)
-            self.parent.parent.power = power
-            self.parent.parent._build()
-            await ix.response.edit_message(view=self.parent.parent)
+            grandparent = self.parent.parent
+            if hasattr(grandparent, "power"):
+                grandparent.power = power
+            grandparent._build()
+            await ix.response.edit_message(view=grandparent)
         else:
             req_id = str(uuid.uuid4())[:8]
             cfg    = load_config(self.gid)
@@ -366,7 +409,6 @@ class EditAbilityModal(Modal, title="Edit Ability"):
             }
             save_config(self.gid, cfg)
             await _notify_admins_moveset(ix.guild, req_id, self.uid, ability, self.gid)
-            self.parent._build()
             self.parent.clear_items()
             self.parent.add_item(Container(
                 TextDisplay(f"**{t(self.gid,'edit_moveset_btn')}**\n\n{t(self.gid,'moveset_pending')}"),
@@ -394,7 +436,8 @@ async def _notify_admins_moveset(guild, req_id, uid, ability, gid):
         if m.guild_permissions.administrator:
             try:
                 view = MovesetApprovalView(gid, req_id, uid, ability, name)
-                await m.send(view=view)
+                dm = await m.create_dm()
+                await dm.send(view=view)
             except Exception: pass
 
 
@@ -429,7 +472,7 @@ class MovesetApprovalView(LayoutView):
             try:
                 from aot_bot_instance import bot as _bot
                 user = await _bot.fetch_user(int(req["user_id"]))
-                await user.send(t(self.gid, "moveset_approved", ability=req["ability"]["name"]))
+                await cv2_dm(user, t(self.gid, "moveset_approved", ability=req["ability"]["name"]))
             except Exception: pass
         self.clear_items()
         self.add_item(Container(TextDisplay("✅ Approved.")))
@@ -443,7 +486,7 @@ class MovesetApprovalView(LayoutView):
             try:
                 from aot_bot_instance import bot as _bot
                 user = await _bot.fetch_user(int(req["user_id"]))
-                await user.send(t(self.gid, "moveset_declined", ability=req["ability"]["name"]))
+                await cv2_dm(user, t(self.gid, "moveset_declined", ability=req["ability"]["name"]))
             except Exception: pass
         self.clear_items()
         self.add_item(Container(TextDisplay("❌ Declined.")))
@@ -487,13 +530,11 @@ async def check_titan_expiry():
                     if existing: new_power["expires_at"] = existing[0]["expires_at"]
                     new_player.setdefault("titan_powers", []).append(new_power)
                     players[new_uid] = new_player
-                    try: await new_member.send(t(gid, "got_titan_dm", titan=titan))
-                    except Exception: pass
+                    await cv2_dm(new_member, t(gid, "got_titan_dm", titan=titan))
                     new_name = new_member.display_name
                     for m in guild.members:
                         if m.guild_permissions.administrator:
-                            try: await m.send(t(gid, "admin_got_titan", new_owner=new_name, titan=titan, old_owner=old_name))
-                            except Exception: pass
+                            await cv2_dm(m, t(gid, "admin_got_titan", new_owner=new_name, titan=titan, old_owner=old_name))
                     ch_id = cfg.get("titan_announcement_channel")
                     if ch_id:
                         ch = guild.get_channel(int(ch_id))
