@@ -17,6 +17,24 @@ DEFAULT_CONFIG = {
     "roles": {"faction": {}, "rank": {}, "shifter": {}, "bloodline": {}},
     "factions": ["Survey Corps", "Military Police", "Garrison", "Stationary Guard", "Merchants", "Civilian"],
     "ranks": ["Cadet", "Soldier", "Section Commander", "Commander", "General"],
+    "faction_roles": [
+        {"name": "Recruit",         "image": RANK_EMBLEMS.get("Cadet", ""),        "ranks": [{"name": "Cadet",             "visible": True}]},
+        {"name": "Survey Corps",    "image": RANK_EMBLEMS.get("Survey Corps", ""), "ranks": [{"name": "Soldier",           "visible": True},
+                                                                                              {"name": "Section Commander", "visible": False},
+                                                                                              {"name": "Commander",         "visible": False},
+                                                                                              {"name": "General",           "visible": False}]},
+        {"name": "Military Police", "image": RANK_EMBLEMS.get("Military", ""),     "ranks": [{"name": "Cadet",             "visible": True},
+                                                                                              {"name": "MP Soldier",        "visible": False},
+                                                                                              {"name": "MP Officer",        "visible": False}]},
+        {"name": "Garrison",        "image": RANK_EMBLEMS.get("Stationary", ""),   "ranks": [{"name": "Cadet",             "visible": True},
+                                                                                              {"name": "Soldier",           "visible": False},
+                                                                                              {"name": "Officer",           "visible": False}]},
+        {"name": "Stationary Guard","image": "",                                   "ranks": [{"name": "Guard",             "visible": True},
+                                                                                              {"name": "Commander",         "visible": False}]},
+        {"name": "Merchants",       "image": "",                                   "ranks": [{"name": "Merchant",          "visible": True}]},
+        {"name": "Civilian",        "image": "",                                   "ranks": [{"name": "Civilian",          "visible": True}]},
+    ],
+    "rank_access": {},
     "shifters": ["Attack Titan", "Armored Titan", "Colossal Titan", "Female Titan", "Beast Titan",
                  "Jaw Titan", "Cart Titan", "War Hammer Titan", "Founding Titan"],
     "bloodlines_common": ["Human", "Mixed Blood"],
@@ -27,6 +45,15 @@ DEFAULT_CONFIG = {
     "titan_announcement_channel": None,
     "pending_moveset_requests": {},
     "stamina_regen_per_minute": 1,
+    "stamina_regen_interval_minutes": 5,
+    "stamina_regen_amount": 5,
+    "auto_deform_cooldown_minutes": 60,
+    "transform_min_stamina": 30,
+    "announcement_channels": [],
+    "announcement_permitted_roles": [],
+    "currency_name": "Coins",
+    "currency_emoji": "",
+    "currency_image": "",
 }
 
 # ── i18n ─────────────────────────────────────────────────────────────────────
@@ -123,6 +150,85 @@ LANG = {
         "item_used_msg": "✅ คุณใช้ **{item}** แล้ว",
         "item_given_msg": "🎁 **{sender}** ส่ง **{item}** ให้คุณ!",
         "item_sold_msg": "💰 คุณขาย **{item}** ได้ **{price}** เหรียญ ยอดรวม: **{balance}** เหรียญ",
+        "config_title": "ตั้งค่า",
+        "config_page": "หน้า {page}/{total}",
+        "prev_btn": "◀ ก่อนหน้า",
+        "next_btn": "ถัดไป ▶",
+        "general_page": "🔧 ทั่วไป",
+        "roles_page": "🎭 บทบาท",
+        "lists_page": "📋 รายการ",
+        "permissions_page": "🔑 สิทธิ์",
+        "language_section": "🌐 ภาษา",
+        "currency_section": "💰 สกุลเงิน",
+        "ann_channels_section": "📢 ช่องทางประกาศ",
+        "configure_btn": "ตั้งค่า",
+        "currency_name_field": "ชื่อสกุลเงิน",
+        "currency_emoji_field": "อิโมจิ (ไม่บังคับ)",
+        "currency_img_field": "URL รูปภาพ (ไม่บังคับ)",
+        "announcement_title": "📢 การประกาศ",
+        "create_draft_btn": "สร้างร่างประกาศ",
+        "no_drafts": "ยังไม่มีร่างประกาศ",
+        "draft_name_field": "ชื่อประกาศ",
+        "draft_created": "✅ สร้างร่างประกาศ **{name}** แล้ว",
+        "edit_title_btn": "แก้ไขชื่อเรื่อง",
+        "edit_content_btn": "แก้ไขเนื้อหา",
+        "publish_btn": "🚀 เผยแพร่",
+        "delete_draft_btn": "🗑️ ลบ",
+        "ann_title_field": "ชื่อเรื่อง",
+        "ann_content_field": "เนื้อหา",
+        "ann_published": "📢 เผยแพร่แล้ว!",
+        "no_ann_channels": "❌ ยังไม่ได้ตั้งค่าช่องทางประกาศ ใช้ /config หน้า 1 เพื่อตั้งค่า",
+        "ann_no_permission": "❌ คุณไม่มีสิทธิ์ใช้คำสั่งนี้",
+        "ann_permitted_roles_section": "🔑 สิทธิ์ใช้คำสั่งประกาศ",
+        "shop_title": "🏪 ร้านค้า",
+        "shop_setup_title": "ตั้งค่าร้านค้าใหม่",
+        "shop_config_title": "จัดการร้านค้า",
+        "no_shops": "ยังไม่มีร้านค้า",
+        "shop_name_field": "ชื่อร้านค้า",
+        "shop_owner_field": "เจ้าของร้าน",
+        "shop_desc_field": "คำอธิบายร้านค้า",
+        "style_channel": "ช่องข้อความ",
+        "style_thread": "เธรด",
+        "style_forum": "ฟอรัม",
+        "shop_created": "✅ สร้างร้านค้า **{name}** แล้ว",
+        "shop_img_field": "URL รูปภาพ (ไม่บังคับ)",
+        "out_of_stock_label": "หมดสต็อก",
+        "purchase_success": "✅ ซื้อ **{item}** สำเร็จ ราคา **{price}** คงเหลือ **{balance}**",
+        "insufficient_funds": "❌ เงินไม่เพียงพอ ต้องการ **{price}** มี **{balance}**",
+        "balance_title": "💰 ยอดเงิน",
+        "your_balance_label": "ยอดเงินของคุณ",
+        "shop_item_name_field": "ชื่อสินค้า",
+        "shop_item_price_field": "ราคา",
+        "shop_item_desc_field": "คำอธิบาย",
+        "shop_item_cat_field": "หมวดหมู่",
+        "shop_item_stock_field": "สต็อก (-1 = ไม่จำกัด)",
+        "shop_item_restock_field": "รีสต็อกทุก (นาที, 0 = ไม่รีสต็อก)",
+        "items_title": "📦 รายการไอเทม",
+        "item_when_use_field": "ข้อความเมื่อใช้ (ว่าง = ใช้ไม่ได้)",
+        "item_image_field": "URL รูปภาพ (ไม่บังคับ)",
+        "material_tag": "📦 วัสดุ",
+        "usable_tag": "✅ ใช้ได้",
+        "shifter_admin_title": "⚙️ แผงแอดมินผู้แปลงร่าง",
+        "grant_btn": "ให้สิทธิ์",
+        "revoke_btn": "เพิกถอน",
+        "tracker_btn": "ติดตาม",
+        "set_time_btn": "ตั้งเวลา",
+        "buy_btn": "🛒 ซื้อ",
+        "buy_confirm": "ยืนยันการซื้อ **{item}** ราคา **{price}** หรือไม่?",
+        "confirm_btn2": "✅ ยืนยัน",
+        "cancel_btn": "❌ ยกเลิก",
+        "restock_label": "เติมสต็อก: {interval}",
+        "unlimited_stock": "ไม่จำกัด",
+        "shop_channel_set": "เลือกช่องทาง",
+        "add_image_btn": "เพิ่มรูปภาพ",
+        "detransform_hidden": "🔄 ไทแทนได้ถอยร่างแล้ว",
+        "ability_used_hidden": "⚔️ ไทแทนใช้ **{ability}**!",
+        "transform_cooldown_msg": "⏳ การแปลงร่างอยู่ในช่วงคูลดาวน์อีก **{mins}** นาที",
+        "ability_pending_config": "⚙️ ทักษะนี้รอการตั้งค่าจากแอดมิน ยังไม่สามารถใช้ได้",
+        "show_profile_btn": "📋 แสดงโปรไฟล์",
+        "manage_faction_roles_btn": "จัดการสังกัดและยศ",
+        "grant_rank_btn": "ให้ยศพิเศษ",
+        "got_rank_dm": "✨ คุณได้รับสิทธิ์ยศ **{rank}** ใน **{faction}** แล้ว! ใช้ `/profile` เพื่ออัปเดต",
     },
     "en": {
         "profile_title": "Character Profile",
@@ -215,6 +321,85 @@ LANG = {
         "item_used_msg": "✅ You used **{item}**.",
         "item_given_msg": "🎁 **{sender}** sent you **{item}**!",
         "item_sold_msg": "💰 You sold **{item}** for **{price}** coins. Balance: **{balance}** coins.",
+        "config_title": "Configuration",
+        "config_page": "Page {page}/{total}",
+        "prev_btn": "◀ Prev",
+        "next_btn": "Next ▶",
+        "general_page": "🔧 General",
+        "roles_page": "🎭 Roles",
+        "lists_page": "📋 Lists",
+        "permissions_page": "🔑 Permissions",
+        "language_section": "🌐 Language",
+        "currency_section": "💰 Currency",
+        "ann_channels_section": "📢 Announcement Channels",
+        "configure_btn": "Configure",
+        "currency_name_field": "Currency Name",
+        "currency_emoji_field": "Emoji (optional)",
+        "currency_img_field": "Image URL (optional)",
+        "announcement_title": "📢 Announcements",
+        "create_draft_btn": "Create Draft",
+        "no_drafts": "No drafts yet.",
+        "draft_name_field": "Announcement Name",
+        "draft_created": "✅ Draft **{name}** created.",
+        "edit_title_btn": "Edit Title",
+        "edit_content_btn": "Edit Content",
+        "publish_btn": "🚀 Publish",
+        "delete_draft_btn": "🗑️ Delete",
+        "ann_title_field": "Title",
+        "ann_content_field": "Content",
+        "ann_published": "📢 Published!",
+        "no_ann_channels": "❌ No announcement channels configured. Use /config page 1 to set them.",
+        "ann_no_permission": "❌ You don't have permission to use this command.",
+        "ann_permitted_roles_section": "🔑 Announcement Permissions",
+        "shop_title": "🏪 Shop",
+        "shop_setup_title": "Setup New Shop",
+        "shop_config_title": "Shop Config",
+        "no_shops": "No shops yet.",
+        "shop_name_field": "Shop Name",
+        "shop_owner_field": "Owner",
+        "shop_desc_field": "Shop Description",
+        "style_channel": "Channel",
+        "style_thread": "Thread",
+        "style_forum": "Forum",
+        "shop_created": "✅ Shop **{name}** created.",
+        "shop_img_field": "Image URL (optional)",
+        "out_of_stock_label": "Out of Stock",
+        "purchase_success": "✅ Purchased **{item}** for **{price}**. Balance: **{balance}**",
+        "insufficient_funds": "❌ Insufficient funds. Need **{price}**, have **{balance}**.",
+        "balance_title": "💰 Balance",
+        "your_balance_label": "Your Balance",
+        "shop_item_name_field": "Item Name",
+        "shop_item_price_field": "Price",
+        "shop_item_desc_field": "Description",
+        "shop_item_cat_field": "Category",
+        "shop_item_stock_field": "Stock (-1 = unlimited)",
+        "shop_item_restock_field": "Restock every (min, 0 = never)",
+        "items_title": "📦 Item List",
+        "item_when_use_field": "When Used Message (empty = material item)",
+        "item_image_field": "Image URL (optional)",
+        "material_tag": "📦 Material",
+        "usable_tag": "✅ Usable",
+        "shifter_admin_title": "⚙️ Shifter Admin Panel",
+        "grant_btn": "Grant",
+        "revoke_btn": "Revoke",
+        "tracker_btn": "Tracker",
+        "set_time_btn": "Set Time",
+        "buy_btn": "🛒 Buy",
+        "buy_confirm": "Confirm purchasing **{item}** for **{price}**?",
+        "confirm_btn2": "✅ Confirm",
+        "cancel_btn": "❌ Cancel",
+        "restock_label": "Restock: {interval}",
+        "unlimited_stock": "Unlimited",
+        "shop_channel_set": "Select Channel",
+        "add_image_btn": "Add Image",
+        "detransform_hidden": "🔄 The titan has retreated.",
+        "ability_used_hidden": "⚔️ The titan uses **{ability}**!",
+        "transform_cooldown_msg": "⏳ Transform on cooldown — **{mins}** minutes remaining.",
+        "ability_pending_config": "⚙️ This ability is pending admin configuration and cannot be used yet.",
+        "show_profile_btn": "📋 Show Profile",
+        "manage_faction_roles_btn": "Manage Faction Roles",
+        "grant_rank_btn": "Grant Hidden Rank",
+        "got_rank_dm": "✨ You've been granted **{rank}** rank in **{faction}**! Use `/profile` to update.",
     },
 }
 
@@ -279,6 +464,18 @@ def load_items(guild_id: int) -> dict:
 def save_items(guild_id: int, data: dict):
     _save_json(DATA_DIR / f"items_{guild_id}.json", data)
 
+def load_announcements(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"announcements_{guild_id}.json", lambda: {"drafts": {}})
+
+def save_announcements(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"announcements_{guild_id}.json", data)
+
+def load_shops(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"shops_{guild_id}.json", lambda: {"shops": {}})
+
+def save_shops(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"shops_{guild_id}.json", data)
+
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -308,6 +505,42 @@ def has_shifter_access(guild_id: int, user_id: int) -> bool:
     cfg = load_config(guild_id)
     return str(user_id) in cfg.get("shifter_access", [])
 
+
+def get_faction_names(guild_id: int) -> list:
+    cfg = load_config(guild_id)
+    frs = cfg.get("faction_roles", [])
+    return [fr["name"] for fr in frs] if frs else cfg.get("factions", [])
+
+
+def get_all_rank_names(guild_id: int) -> list:
+    cfg = load_config(guild_id)
+    frs = cfg.get("faction_roles", [])
+    if not frs:
+        return cfg.get("ranks", [])
+    seen: set = set(); names: list = []
+    for fr in frs:
+        for r in fr.get("ranks", []):
+            if r["name"] not in seen:
+                seen.add(r["name"]); names.append(r["name"])
+    return names
+
+
+def get_visible_ranks_for_faction(guild_id: int, faction_name: str, user_id: int) -> list:
+    cfg = load_config(guild_id)
+    granted = set(cfg.get("rank_access", {}).get(str(user_id), []))
+    for fr in cfg.get("faction_roles", []):
+        if fr["name"] == faction_name:
+            return [r["name"] for r in fr.get("ranks", [])
+                    if r.get("visible", True) or r["name"] in granted]
+    return cfg.get("ranks", [])
+
+
+def get_faction_emblem(guild_id: int, faction_name: str) -> str:
+    cfg = load_config(guild_id)
+    for fr in cfg.get("faction_roles", []):
+        if fr["name"] == faction_name:
+            return fr.get("image", "").strip()
+    return RANK_EMBLEMS.get(faction_name, "")
 
 
 
@@ -345,6 +578,13 @@ async def remove_old_roles(member: _discord.Member, old: dict, cfg: dict):
 
 
 # ── Profile text ──────────────────────────────────────────────────────────────
+
+def format_currency(amount: int, cfg: dict) -> str:
+    name  = cfg.get("currency_name", "Coins")
+    emoji = cfg.get("currency_emoji", "").strip()
+    prefix = f"{emoji} " if emoji else ""
+    return f"{prefix}{amount} {name}"
+
 
 def format_profile_text(player: dict, display_name: str, guild_id: int) -> str:
     rank = player.get("rank", "?")

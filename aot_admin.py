@@ -727,13 +727,3 @@ class LanguageView(LayoutView):
         await ix.response.edit_message(view=self.parent)
 
 
-# ── /admin command ────────────────────────────────────────────────────────────
-
-@bot.tree.command(name="admin", description="Admin panel")
-@is_admin()
-async def admin_cmd(ix: discord.Interaction):
-    await ix.response.send_message(view=AdminMainView(ix.guild_id), ephemeral=True)
-
-@admin_cmd.error
-async def admin_error(ix, error):
-    await ix.response.send_message(t(ix.guild_id, "admin_only"), ephemeral=True)
