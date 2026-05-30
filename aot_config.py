@@ -8,6 +8,7 @@ from aot_bot_instance import bot
 from aot_shared import (
     t, load_config, save_config, load_players, save_players,
     select_options_from_list, format_currency,
+    get_faction_names, get_all_rank_names, cv2_dm,
 )
 
 
@@ -322,6 +323,310 @@ class BloodlineAccessView(LayoutView):
         self.parent._build(); await ix.response.edit_message(view=self.parent)
 
 
+# ── Faction role management ───────────────────────────────────────────────────
+
+class _FactionModal(Modal):
+    f_name  = TextInput(label="Faction Name",                         max_length=60)
+    f_image = TextInput(label="Image URL or Emoji ID (optional)",     max_length=300, required=False)
+
+    def __init__(self, gid, parent, prefill=None):
+        super().__init__(title="Edit Faction" if prefill else "Add Faction")
+        self.gid = gid; self.parent = parent; self.prefill = prefill
+        if prefill:
+            self.f_name.default  = prefill.get("name", "")
+            self.f_image.default = prefill.get("image", "")
+
+    async def on_submit(self, ix):
+        cfg = load_config(self.gid)
+        frs  = cfg.setdefault("faction_roles", [])
+        name  = self.f_name.value.strip()
+        image = (self.f_image.value or "").strip()
+        if not name:
+            await ix.response.defer(); return
+        if self.prefill:
+            old_name = self.prefill["name"]
+            for fr in frs:
+                if fr["name"] == old_name:
+                    fr["name"] = name; fr["image"] = image; break
+        else:
+            if not any(fr["name"] == name for fr in frs):
+                frs.append({"name": name, "image": image, "ranks": []})
+        save_config(self.gid, cfg)
+        self.parent.sel = name
+        self.parent._build()
+        await ix.response.edit_message(view=self.parent)
+
+
+class _AddRankModal(Modal):
+    f_name = TextInput(label="Rank Name", max_length=60)
+
+    def __init__(self, gid, faction_name, parent):
+        super().__init__(title="Add Rank")
+        self.gid = gid; self.faction_name = faction_name; self.parent = parent
+
+    async def on_submit(self, ix):
+        cfg = load_config(self.gid)
+        rname = self.f_name.value.strip()
+        for fr in cfg.get("faction_roles", []):
+            if fr["name"] == self.faction_name:
+                if rname and not any(r["name"] == rname for r in fr.get("ranks", [])):
+                    fr.setdefault("ranks", []).append({"name": rname, "visible": True})
+                break
+        save_config(self.gid, cfg)
+        self.parent._build()
+        await ix.response.edit_message(view=self.parent)
+
+
+class FactionRoleManageView(LayoutView):
+    def __init__(self, gid, parent):
+        super().__init__(timeout=300)
+        self.gid = gid; self.parent = parent; self.sel = None
+        self._build()
+
+    def _build(self):
+        self.clear_items()
+        cfg = load_config(self.gid)
+        frs = cfg.get("faction_roles", [])
+
+        lines = ["**Faction Roles**", ""]
+        for fr in frs:
+            img_ind = "🖼️" if fr.get("image") else "—"
+            vis   = [r["name"] for r in fr.get("ranks", []) if r.get("visible", True)]
+            hiddn = [r["name"] for r in fr.get("ranks", []) if not r.get("visible", True)]
+            r_txt = ", ".join(vis[:3]) or "*no ranks*"
+            if hiddn: r_txt += f" (+{len(hiddn)} 🔒)"
+            lines.append(f"**{fr['name']}** {img_ind} — {r_txt}")
+
+        names = [fr["name"] for fr in frs]
+        fsel = Select(placeholder="Select faction",
+                      options=select_options_from_list(names, self.sel) if names
+                              else [discord.SelectOption(label="—", value="__none__")])
+        fsel.callback = self._sel_cb
+
+        add   = Button(label="Add",          style=discord.ButtonStyle.green,     custom_id="fr_add")
+        edit  = Button(label="Edit",         style=discord.ButtonStyle.secondary, custom_id="fr_edit")
+        ranks = Button(label="Manage Ranks", style=discord.ButtonStyle.secondary, custom_id="fr_ranks")
+        rem   = Button(label="Remove",       style=discord.ButtonStyle.danger,    custom_id="fr_rem")
+        bk    = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="fr_bk")
+        add.callback = self._add; edit.callback = self._edit
+        ranks.callback = self._ranks; rem.callback = self._remove; bk.callback = self._back
+
+        self.add_item(Container(
+            TextDisplay("\n".join(lines)), Separator(),
+            ActionRow(fsel),
+            ActionRow(add, edit, rem),
+            ActionRow(ranks),
+            ActionRow(bk),
+        ))
+
+    async def _sel_cb(self, ix):
+        v = ix.data["values"][0]
+        if v != "__none__": self.sel = v
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _add(self, ix):
+        await ix.response.send_modal(_FactionModal(self.gid, self))
+
+    async def _edit(self, ix):
+        if not self.sel:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid)
+        fr = next((f for f in cfg.get("faction_roles", []) if f["name"] == self.sel), None)
+        if not fr:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        await ix.response.send_modal(_FactionModal(self.gid, self, prefill=fr))
+
+    async def _ranks(self, ix):
+        if not self.sel:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        await ix.response.edit_message(view=FactionRankView(self.gid, self.sel, self))
+
+    async def _remove(self, ix):
+        if not self.sel:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid)
+        cfg["faction_roles"] = [f for f in cfg.get("faction_roles", []) if f["name"] != self.sel]
+        save_config(self.gid, cfg)
+        self.sel = None; self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _back(self, ix):
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+
+
+class FactionRankView(LayoutView):
+    def __init__(self, gid, faction_name, parent):
+        super().__init__(timeout=300)
+        self.gid = gid; self.faction_name = faction_name
+        self.parent = parent; self.sel_rank = None
+        self._build()
+
+    def _build(self):
+        self.clear_items()
+        cfg = load_config(self.gid)
+        fr    = next((f for f in cfg.get("faction_roles", []) if f["name"] == self.faction_name), None)
+        ranks = fr.get("ranks", []) if fr else []
+
+        lines = [f"**{self.faction_name} — Ranks**", ""]
+        for r in ranks:
+            vis = "👁️" if r.get("visible", True) else "🔒"
+            lines.append(f"{vis} {r['name']}")
+
+        rank_names = [r["name"] for r in ranks]
+        rsel = Select(placeholder="Select rank",
+                      options=select_options_from_list(rank_names, self.sel_rank) if rank_names
+                              else [discord.SelectOption(label="—", value="__none__")])
+        rsel.callback = self._rsel_cb
+
+        add    = Button(label="Add",            style=discord.ButtonStyle.green,     custom_id="frr_add")
+        toggle = Button(label="👁️ Toggle",      style=discord.ButtonStyle.secondary, custom_id="frr_tgl")
+        rem    = Button(label="Remove",         style=discord.ButtonStyle.danger,    custom_id="frr_rem")
+        bk     = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="frr_bk")
+        add.callback = self._add; toggle.callback = self._toggle
+        rem.callback = self._remove; bk.callback = self._back
+
+        self.add_item(Container(
+            TextDisplay("\n".join(lines)), Separator(),
+            ActionRow(rsel),
+            ActionRow(add, toggle, rem),
+            ActionRow(bk),
+        ))
+
+    async def _rsel_cb(self, ix):
+        v = ix.data["values"][0]
+        if v != "__none__": self.sel_rank = v
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _add(self, ix):
+        await ix.response.send_modal(_AddRankModal(self.gid, self.faction_name, self))
+
+    async def _toggle(self, ix):
+        if not self.sel_rank:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid)
+        for fr in cfg.get("faction_roles", []):
+            if fr["name"] == self.faction_name:
+                for r in fr.get("ranks", []):
+                    if r["name"] == self.sel_rank:
+                        r["visible"] = not r.get("visible", True); break
+                break
+        save_config(self.gid, cfg); self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _remove(self, ix):
+        if not self.sel_rank:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid)
+        for fr in cfg.get("faction_roles", []):
+            if fr["name"] == self.faction_name:
+                fr["ranks"] = [r for r in fr.get("ranks", []) if r["name"] != self.sel_rank]; break
+        save_config(self.gid, cfg); self.sel_rank = None; self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _back(self, ix):
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+
+
+# ── Hidden rank access ────────────────────────────────────────────────────────
+
+class RankAccessView(LayoutView):
+    def __init__(self, gid, parent):
+        super().__init__(timeout=300)
+        self.gid = gid; self.parent = parent
+        self.sel_faction = None; self.sel_rank = None; self.sel_users = []
+        self._build()
+
+    def _hidden_ranks(self):
+        cfg = load_config(self.gid)
+        if not self.sel_faction: return []
+        for fr in cfg.get("faction_roles", []):
+            if fr["name"] == self.sel_faction:
+                return [r["name"] for r in fr.get("ranks", []) if not r.get("visible", True)]
+        return []
+
+    def _build(self):
+        self.clear_items()
+        cfg = load_config(self.gid)
+        frs = cfg.get("faction_roles", [])
+        acc = cfg.get("rank_access", {})
+
+        grant_lines = [f"  <@{uid}>: {', '.join(rnks)}" for uid, rnks in list(acc.items())[:8]]
+        grants_text = "\n".join(grant_lines) or "  *None*"
+        text = f"**Hidden Rank Access**\n\n**Current Grants:**\n{grants_text}"
+
+        faction_names = [fr["name"] for fr in frs]
+        hidden_ranks  = self._hidden_ranks()
+
+        fsel = Select(placeholder="Select Faction",
+                      options=select_options_from_list(faction_names, self.sel_faction) if faction_names
+                              else [discord.SelectOption(label="—", value="__none__")])
+        fsel.callback = self._fsel_cb
+
+        rsel = Select(placeholder="Select Hidden Rank",
+                      options=select_options_from_list(hidden_ranks, self.sel_rank) if hidden_ranks
+                              else [discord.SelectOption(label="No hidden ranks", value="__none__")])
+        rsel.callback = self._rsel_cb
+
+        us = discord.ui.UserSelect(placeholder="Select users (multi)", min_values=1, max_values=25)
+        us.callback = self._user_cb
+
+        grant  = Button(label="Grant",  style=discord.ButtonStyle.green,     custom_id="ra_gr")
+        revoke = Button(label="Revoke", style=discord.ButtonStyle.danger,    custom_id="ra_rv")
+        bk     = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="ra_bk")
+        grant.callback = self._grant; revoke.callback = self._revoke; bk.callback = self._back
+
+        self.add_item(Container(
+            TextDisplay(text), Separator(),
+            ActionRow(fsel), ActionRow(rsel), ActionRow(us),
+            ActionRow(grant, revoke), ActionRow(bk),
+        ))
+
+    async def _fsel_cb(self, ix):
+        v = ix.data["values"][0]
+        if v != "__none__":
+            self.sel_faction = v; self.sel_rank = None
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _rsel_cb(self, ix):
+        v = ix.data["values"][0]
+        if v != "__none__": self.sel_rank = v
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _user_cb(self, ix):
+        self.sel_users = ix.data["values"]; await ix.response.defer()
+
+    async def _grant(self, ix):
+        if not self.sel_rank or not self.sel_users:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid); acc = cfg.setdefault("rank_access", {})
+        for uid in self.sel_users:
+            if self.sel_rank not in acc.get(uid, []):
+                acc.setdefault(uid, []).append(self.sel_rank)
+        save_config(self.gid, cfg)
+        from aot_bot_instance import bot as _bot
+        for uid in self.sel_users:
+            try:
+                user = await _bot.fetch_user(int(uid))
+                await cv2_dm(user, t(self.gid, "got_rank_dm",
+                                     rank=self.sel_rank, faction=self.sel_faction or ""))
+            except Exception: pass
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _revoke(self, ix):
+        if not self.sel_rank or not self.sel_users:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid); acc = cfg.get("rank_access", {})
+        for uid in self.sel_users:
+            lst = acc.get(uid, [])
+            if self.sel_rank in lst: lst.remove(self.sel_rank)
+            if not lst: acc.pop(uid, None)
+        save_config(self.gid, cfg)
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _back(self, ix):
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+
+
 # ── Main ConfigView (4 pages) ─────────────────────────────────────────────────
 
 class ConfigMainView(LayoutView):
@@ -381,8 +686,8 @@ class ConfigMainView(LayoutView):
 
     def _p2_roles(self):
         gid = self.gid; cfg = load_config(gid)
-        factions  = cfg.get("factions", [])
-        ranks     = cfg.get("ranks", [])
+        factions   = get_faction_names(gid)
+        ranks      = get_all_rank_names(gid)
         bloodlines = cfg.get("bloodlines_common", []) + cfg.get("bloodlines_special", [])
 
         def _role_btn(label, cid, cb):
@@ -394,9 +699,9 @@ class ConfigMainView(LayoutView):
         rs = _role_btn("Shifter Roles",   "cfg_rs",  self._make_role_cb("shifter",   cfg.get("shifters",[])))
         rb = _role_btn("Bloodline Roles", "cfg_rb",  self._make_role_cb("bloodline", bloodlines))
 
-        fac_prev = _role_preview(cfg, "faction",   factions[:3],    self.guild)
-        rank_prev = _role_preview(cfg, "rank",     ranks[:3],       self.guild)
-        bl_prev  = _role_preview(cfg, "bloodline", bloodlines[:3],  self.guild)
+        fac_prev  = _role_preview(cfg, "faction",   factions[:3],   self.guild)
+        rank_prev = _role_preview(cfg, "rank",      ranks[:3],      self.guild)
+        bl_prev   = _role_preview(cfg, "bloodline", bloodlines[:3], self.guild)
 
         self.add_item(Container(
             TextDisplay(f"**{t(gid,'config_title')}** — {t(gid,'config_page', page=2, total=4)} | {t(gid,'roles_page')}"),
@@ -415,9 +720,10 @@ class ConfigMainView(LayoutView):
 
     def _p3_lists(self):
         gid = self.gid; cfg = load_config(gid)
-        fac  = ", ".join(cfg.get("factions", [])[:5]) or "*None*"
-        rnk  = ", ".join(cfg.get("ranks", [])[:5])    or "*None*"
-        tit  = ", ".join(cfg.get("shifters", [])[:5]) or "*None*"
+        frs = cfg.get("faction_roles", [])
+        fac_summary = ", ".join(fr["name"] for fr in frs[:5]) or "*None*"
+        if len(frs) > 5: fac_summary += f" +{len(frs)-5}"
+        tit = ", ".join(cfg.get("shifters", [])[:5]) or "*None*"
 
         def _lb(label, cid, cb):
             b = Button(label=label, style=discord.ButtonStyle.secondary, custom_id=cid)
@@ -426,17 +732,14 @@ class ConfigMainView(LayoutView):
         self.add_item(Container(
             TextDisplay(f"**{t(gid,'config_title')}** — {t(gid,'config_page', page=3, total=4)} | {t(gid,'lists_page')}"),
             Separator(),
-            TextDisplay(f"**Factions**\n{fac}"),
-            ActionRow(_lb("Manage Factions",  "cfg_mf",  self._make_list_cb("factions",  "Factions"))),
-            Separator(),
-            TextDisplay(f"**Ranks**\n{rnk}"),
-            ActionRow(_lb("Manage Ranks",     "cfg_mr",  self._make_list_cb("ranks",     "Ranks"))),
+            TextDisplay(f"**Faction Roles** (factions + ranks + emblems)\n{fac_summary}"),
+            ActionRow(_lb("Manage Faction Roles", "cfg_mfr", self._faction_roles)),
             Separator(),
             TextDisplay(f"**Titans**\n{tit}"),
-            ActionRow(_lb("Manage Titans",    "cfg_mt",  self._make_list_cb("shifters",  "Titans"))),
+            ActionRow(_lb("Manage Titans",        "cfg_mt",  self._make_list_cb("shifters", "Titans"))),
             Separator(),
             TextDisplay("**Bloodlines** (Common + Special)"),
-            ActionRow(_lb("Manage Bloodlines","cfg_mb",  self._bloodlines)),
+            ActionRow(_lb("Manage Bloodlines",    "cfg_mb",  self._bloodlines)),
             Separator(),
             self._nav_row(),
         ))
@@ -445,11 +748,12 @@ class ConfigMainView(LayoutView):
         gid = self.gid; cfg = load_config(gid)
         ann_roles = _ann_roles_display(cfg, self.guild)
 
-        add_r = Button(label="+ Announce Role", style=discord.ButtonStyle.green,  custom_id="cfg_arr")
-        rem_r = Button(label="— Announce Role", style=discord.ButtonStyle.danger, custom_id="cfg_rrr")
+        add_r = Button(label="+ Announce Role", style=discord.ButtonStyle.green,     custom_id="cfg_arr")
+        rem_r = Button(label="— Announce Role", style=discord.ButtonStyle.danger,    custom_id="cfg_rrr")
         bl_a  = Button(label="Bloodline Access",style=discord.ButtonStyle.secondary, custom_id="cfg_bla")
+        ra    = Button(label="Rank Access",     style=discord.ButtonStyle.secondary, custom_id="cfg_ra")
         add_r.callback = self._add_ann_role; rem_r.callback = self._rem_ann_role
-        bl_a.callback  = self._bl_access
+        bl_a.callback  = self._bl_access;   ra.callback    = self._rank_access
 
         self.add_item(Container(
             TextDisplay(f"**{t(gid,'config_title')}** — {t(gid,'config_page', page=4, total=4)} | {t(gid,'permissions_page')}"),
@@ -459,6 +763,9 @@ class ConfigMainView(LayoutView):
             Separator(),
             TextDisplay("**Special Bloodline Access**"),
             ActionRow(bl_a),
+            Separator(),
+            TextDisplay("**Hidden Rank Access** — grant locked ranks to specific players"),
+            ActionRow(ra),
             Separator(),
             self._nav_row(),
         ))
@@ -506,6 +813,9 @@ class ConfigMainView(LayoutView):
     async def _bloodlines(self, ix):
         await ix.response.edit_message(view=BloodlineManageView(self.gid, self))
 
+    async def _faction_roles(self, ix):
+        await ix.response.edit_message(view=FactionRoleManageView(self.gid, self))
+
     # ── page 4 callbacks ──
     async def _add_ann_role(self, ix):
         await ix.response.edit_message(view=_AnnRoleView(self.gid, "add", self))
@@ -515,6 +825,9 @@ class ConfigMainView(LayoutView):
 
     async def _bl_access(self, ix):
         await ix.response.edit_message(view=BloodlineAccessView(self.gid, self))
+
+    async def _rank_access(self, ix):
+        await ix.response.edit_message(view=RankAccessView(self.gid, self))
 
 
 # ── Channel select helper views ───────────────────────────────────────────────

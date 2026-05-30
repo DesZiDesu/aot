@@ -9,7 +9,8 @@ from aot_shared import (
     t, load_players, save_players, load_config, load_items,
     select_options_from_list, get_available_bloodlines,
     has_shifter_access, assign_roles, remove_old_roles,
-    format_profile_text, cv2_dm, RANK_EMBLEMS, is_url,
+    format_profile_text, cv2_dm, is_url,
+    get_faction_names, get_visible_ranks_for_faction, get_faction_emblem,
 )
 
 
@@ -66,10 +67,10 @@ class RegisterSelectsView(LayoutView):
         self.cfg = cfg; self.bloodlines = bloodlines
         self.existing = existing_player or {}; self.is_edit = is_edit
 
-        factions = cfg.get("factions", [])
-        ranks    = cfg.get("ranks", [])
-        self.sel_faction   = self.existing.get("faction",   factions[0] if factions else "")
-        self.sel_rank      = self.existing.get("rank",      ranks[0]    if ranks    else "")
+        factions = get_faction_names(gid)
+        self.sel_faction   = self.existing.get("faction", factions[0] if factions else "")
+        vis_ranks          = get_visible_ranks_for_faction(gid, self.sel_faction, uid)
+        self.sel_rank      = self.existing.get("rank", vis_ranks[0] if vis_ranks else "")
         self.sel_bloodline = self.existing.get("bloodline", bloodlines[0] if bloodlines else "")
         self._build()
 
@@ -77,12 +78,15 @@ class RegisterSelectsView(LayoutView):
         self.clear_items()
         gid = self.gid
 
+        factions  = get_faction_names(gid)
+        vis_ranks = get_visible_ranks_for_faction(gid, self.sel_faction, self.uid)
+
         sf = Select(placeholder=t(gid, "select_faction"),
-                    options=select_options_from_list(self.cfg.get("factions", []), self.sel_faction))
+                    options=select_options_from_list(factions, self.sel_faction))
         sf.callback = self._faction_cb
 
         sr = Select(placeholder=t(gid, "select_rank"),
-                    options=select_options_from_list(self.cfg.get("ranks", []), self.sel_rank))
+                    options=select_options_from_list(vis_ranks, self.sel_rank))
         sr.callback = self._rank_cb
 
         sb = Select(placeholder=t(gid, "select_bloodline"),
@@ -103,7 +107,10 @@ class RegisterSelectsView(LayoutView):
         self.add_item(Container(*container_children))
 
     async def _faction_cb(self, ix):
-        self.sel_faction = ix.data["values"][0]; self._build()
+        self.sel_faction = ix.data["values"][0]
+        vis_ranks = get_visible_ranks_for_faction(self.gid, self.sel_faction, self.uid)
+        self.sel_rank = vis_ranks[0] if vis_ranks else ""
+        self._build()
         await ix.response.edit_message(view=self)
 
     async def _rank_cb(self, ix):
@@ -172,8 +179,8 @@ class ProfileView(LayoutView):
         player  = players.get(str(self.uid), {})
         text = format_profile_text(player, self.display_name or "Character", gid)
 
-        rank = player.get("rank", "")
-        emblem_url = RANK_EMBLEMS.get(rank, "")
+        faction = player.get("faction", "")
+        emblem_url = get_faction_emblem(gid, faction)
         char_img = player.get("image", "").strip()
 
         pb = Button(label=t(gid, "show_profile_btn"), style=discord.ButtonStyle.primary,   custom_id="pf_profile")
@@ -202,8 +209,8 @@ class ProfileView(LayoutView):
         player  = players.get(str(self.uid), {})
         text = format_profile_text(player, self.display_name or "Character", gid)
 
-        rank = player.get("rank", "")
-        emblem_url = RANK_EMBLEMS.get(rank, "")
+        faction = player.get("faction", "")
+        emblem_url = get_faction_emblem(gid, faction)
         char_img = player.get("image", "").strip()
 
         full_text = f"<@{self.uid}>\n{text}"

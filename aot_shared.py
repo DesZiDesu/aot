@@ -17,6 +17,24 @@ DEFAULT_CONFIG = {
     "roles": {"faction": {}, "rank": {}, "shifter": {}, "bloodline": {}},
     "factions": ["Survey Corps", "Military Police", "Garrison", "Stationary Guard", "Merchants", "Civilian"],
     "ranks": ["Cadet", "Soldier", "Section Commander", "Commander", "General"],
+    "faction_roles": [
+        {"name": "Recruit",         "image": RANK_EMBLEMS.get("Cadet", ""),        "ranks": [{"name": "Cadet",             "visible": True}]},
+        {"name": "Survey Corps",    "image": RANK_EMBLEMS.get("Survey Corps", ""), "ranks": [{"name": "Soldier",           "visible": True},
+                                                                                              {"name": "Section Commander", "visible": False},
+                                                                                              {"name": "Commander",         "visible": False},
+                                                                                              {"name": "General",           "visible": False}]},
+        {"name": "Military Police", "image": RANK_EMBLEMS.get("Military", ""),     "ranks": [{"name": "Cadet",             "visible": True},
+                                                                                              {"name": "MP Soldier",        "visible": False},
+                                                                                              {"name": "MP Officer",        "visible": False}]},
+        {"name": "Garrison",        "image": RANK_EMBLEMS.get("Stationary", ""),   "ranks": [{"name": "Cadet",             "visible": True},
+                                                                                              {"name": "Soldier",           "visible": False},
+                                                                                              {"name": "Officer",           "visible": False}]},
+        {"name": "Stationary Guard","image": "",                                   "ranks": [{"name": "Guard",             "visible": True},
+                                                                                              {"name": "Commander",         "visible": False}]},
+        {"name": "Merchants",       "image": "",                                   "ranks": [{"name": "Merchant",          "visible": True}]},
+        {"name": "Civilian",        "image": "",                                   "ranks": [{"name": "Civilian",          "visible": True}]},
+    ],
+    "rank_access": {},
     "shifters": ["Attack Titan", "Armored Titan", "Colossal Titan", "Female Titan", "Beast Titan",
                  "Jaw Titan", "Cart Titan", "War Hammer Titan", "Founding Titan"],
     "bloodlines_common": ["Human", "Mixed Blood"],
@@ -208,6 +226,9 @@ LANG = {
         "transform_cooldown_msg": "⏳ การแปลงร่างอยู่ในช่วงคูลดาวน์อีก **{mins}** นาที",
         "ability_pending_config": "⚙️ ทักษะนี้รอการตั้งค่าจากแอดมิน ยังไม่สามารถใช้ได้",
         "show_profile_btn": "📋 แสดงโปรไฟล์",
+        "manage_faction_roles_btn": "จัดการสังกัดและยศ",
+        "grant_rank_btn": "ให้ยศพิเศษ",
+        "got_rank_dm": "✨ คุณได้รับสิทธิ์ยศ **{rank}** ใน **{faction}** แล้ว! ใช้ `/profile` เพื่ออัปเดต",
     },
     "en": {
         "profile_title": "Character Profile",
@@ -376,6 +397,9 @@ LANG = {
         "transform_cooldown_msg": "⏳ Transform on cooldown — **{mins}** minutes remaining.",
         "ability_pending_config": "⚙️ This ability is pending admin configuration and cannot be used yet.",
         "show_profile_btn": "📋 Show Profile",
+        "manage_faction_roles_btn": "Manage Faction Roles",
+        "grant_rank_btn": "Grant Hidden Rank",
+        "got_rank_dm": "✨ You've been granted **{rank}** rank in **{faction}**! Use `/profile` to update.",
     },
 }
 
@@ -481,6 +505,42 @@ def has_shifter_access(guild_id: int, user_id: int) -> bool:
     cfg = load_config(guild_id)
     return str(user_id) in cfg.get("shifter_access", [])
 
+
+def get_faction_names(guild_id: int) -> list:
+    cfg = load_config(guild_id)
+    frs = cfg.get("faction_roles", [])
+    return [fr["name"] for fr in frs] if frs else cfg.get("factions", [])
+
+
+def get_all_rank_names(guild_id: int) -> list:
+    cfg = load_config(guild_id)
+    frs = cfg.get("faction_roles", [])
+    if not frs:
+        return cfg.get("ranks", [])
+    seen: set = set(); names: list = []
+    for fr in frs:
+        for r in fr.get("ranks", []):
+            if r["name"] not in seen:
+                seen.add(r["name"]); names.append(r["name"])
+    return names
+
+
+def get_visible_ranks_for_faction(guild_id: int, faction_name: str, user_id: int) -> list:
+    cfg = load_config(guild_id)
+    granted = set(cfg.get("rank_access", {}).get(str(user_id), []))
+    for fr in cfg.get("faction_roles", []):
+        if fr["name"] == faction_name:
+            return [r["name"] for r in fr.get("ranks", [])
+                    if r.get("visible", True) or r["name"] in granted]
+    return cfg.get("ranks", [])
+
+
+def get_faction_emblem(guild_id: int, faction_name: str) -> str:
+    cfg = load_config(guild_id)
+    for fr in cfg.get("faction_roles", []):
+        if fr["name"] == faction_name:
+            return fr.get("image", "").strip()
+    return RANK_EMBLEMS.get(faction_name, "")
 
 
 
