@@ -1,14 +1,15 @@
 """Profile command — registration, display, inventory tab."""
 import asyncio
 import discord
-from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput
+from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput, Section, Thumbnail, MediaGallery
+from discord.components import MediaGalleryItem
 
 from aot_bot_instance import bot
 from aot_shared import (
     t, load_players, save_players, load_config, load_items,
     select_options_from_list, get_available_bloodlines,
     has_shifter_access, assign_roles, remove_old_roles,
-    format_profile_text, format_inventory_text,
+    format_profile_text, cv2_dm, RANK_EMBLEMS, is_url,
 )
 
 
@@ -70,8 +71,6 @@ class RegisterSelectsView(LayoutView):
         self.sel_faction   = self.existing.get("faction",   factions[0] if factions else "")
         self.sel_rank      = self.existing.get("rank",      ranks[0]    if ranks    else "")
         self.sel_bloodline = self.existing.get("bloodline", bloodlines[0] if bloodlines else "")
-        self.sel_shifter   = self.existing.get("shifter",   "None")
-        self.show_shifter  = has_shifter_access(gid, uid)
         self._build()
 
     def _build(self):
@@ -99,16 +98,8 @@ class RegisterSelectsView(LayoutView):
             ActionRow(sf),
             ActionRow(sr),
             ActionRow(sb),
+            ActionRow(confirm),
         ]
-
-        if self.show_shifter:
-            ss = Select(placeholder=t(gid, "select_shifter"),
-                        options=select_options_from_list(
-                            ["None"] + self.cfg.get("shifters", []), self.sel_shifter))
-            ss.callback = self._shifter_cb
-            container_children.append(ActionRow(ss))
-
-        container_children.append(ActionRow(confirm))
         self.add_item(Container(*container_children))
 
     async def _faction_cb(self, ix):
@@ -123,10 +114,6 @@ class RegisterSelectsView(LayoutView):
         self.sel_bloodline = ix.data["values"][0]; self._build()
         await ix.response.edit_message(view=self)
 
-    async def _shifter_cb(self, ix):
-        self.sel_shifter = ix.data["values"][0]; self._build()
-        await ix.response.edit_message(view=self)
-
     async def _confirm(self, ix: discord.Interaction):
         gid, uid = self.gid, self.uid
         players = load_players(gid)
@@ -137,7 +124,7 @@ class RegisterSelectsView(LayoutView):
                   "faction":    self.sel_faction,
                   "rank":       self.sel_rank,
                   "bloodline":  self.sel_bloodline,
-                  "shifter":    self.sel_shifter if self.show_shifter else old.get("shifter", "None"),
+                  "shifter":    old.get("shifter", "None"),
                   "inventory":  old.get("inventory", {}),
                   "titan_powers": old.get("titan_powers", []),
                   "stamina":    old.get("stamina", 100),
@@ -165,12 +152,8 @@ class RegisterSelectsView(LayoutView):
             await msg.delete()
         except Exception:
             pass
-        try:
-            dm = await ix.user.create_dm()
-            profile_text = format_profile_text(player, name, gid)
-            await dm.send(t(gid, "dm_profile", profile=profile_text))
-        except Exception:
-            pass
+        profile_text = format_profile_text(player, name, gid)
+        await cv2_dm(ix.user, t(gid, "dm_profile", profile=profile_text))
 
 
 # ── Profile view (tabs) ───────────────────────────────────────────────────────
@@ -189,6 +172,10 @@ class ProfileView(LayoutView):
         player  = players.get(str(self.uid), {})
         text = format_profile_text(player, self.display_name or "Character", gid)
 
+        rank = player.get("rank", "")
+        emblem_url = RANK_EMBLEMS.get(rank, "")
+        char_img = player.get("image", "").strip()
+
         pb = Button(label=t(gid, "profile_btn"),   style=discord.ButtonStyle.primary,   custom_id="pf_profile")
         pb.callback = self._profile_tab
         ib = Button(label=t(gid, "inventory_btn"), style=discord.ButtonStyle.secondary, custom_id="pf_inventory")
@@ -196,14 +183,18 @@ class ProfileView(LayoutView):
         eb = Button(label=t(gid, "edit_btn"),      style=discord.ButtonStyle.secondary, custom_id="pf_edit")
         eb.callback = self._edit
 
-        rows = [ActionRow(pb, ib, eb)]
+        if emblem_url:
+            main_block = Section(TextDisplay(text), accessory=Thumbnail(media=emblem_url))
+        else:
+            main_block = TextDisplay(text)
 
-        if player.get("titan_powers"):
-            tb = Button(label=t(gid, "transform_btn"), style=discord.ButtonStyle.danger, custom_id="pf_transform")
-            tb.callback = self._transform
-            rows.append(ActionRow(tb))
+        container_children = [main_block, Separator()]
+        if char_img and is_url(char_img):
+            container_children.append(MediaGallery(MediaGalleryItem(media=char_img)))
+            container_children.append(Separator())
+        container_children.append(ActionRow(pb, ib, eb))
 
-        self.add_item(Container(TextDisplay(text), Separator(), *rows))
+        self.add_item(Container(*container_children))
 
     async def _profile_tab(self, ix: discord.Interaction):
         self.display_name = ix.user.display_name
@@ -211,34 +202,14 @@ class ProfileView(LayoutView):
         await ix.response.edit_message(view=self)
 
     async def _inventory_tab(self, ix: discord.Interaction):
-        self.clear_items()
-        player = load_players(self.gid).get(str(self.uid), {})
-        items  = load_items(self.gid)
-        text   = format_inventory_text(player, items, self.gid)
-        gid = self.gid
-
-        pb = Button(label=t(gid, "profile_btn"),   style=discord.ButtonStyle.secondary, custom_id="pf_profile")
-        pb.callback = self._profile_tab
-        ib = Button(label=t(gid, "inventory_btn"), style=discord.ButtonStyle.primary,   custom_id="pf_inventory")
-        ib.callback = self._inventory_tab
-        eb = Button(label=t(gid, "edit_btn"),      style=discord.ButtonStyle.secondary, custom_id="pf_edit")
-        eb.callback = self._edit
-
-        self.add_item(Container(TextDisplay(text), Separator(), ActionRow(pb, ib, eb)))
-        await ix.response.edit_message(view=self)
+        from aot_items import InventoryView
+        await ix.response.edit_message(view=InventoryView(self.uid, self.gid, self))
 
     async def _edit(self, ix: discord.Interaction):
         if ix.user.id != self.uid:
             await ix.response.send_message(t(self.gid, "not_your_profile"), ephemeral=True); return
         player = load_players(self.gid).get(str(self.uid), {})
         await ix.response.send_modal(RegisterModal(self.gid, prefill=player))
-
-    async def _transform(self, ix: discord.Interaction):
-        if ix.user.id != self.uid:
-            await ix.response.send_message(t(self.gid, "not_your_profile"), ephemeral=True); return
-        from aot_shifter import TransformView
-        view = TransformView(self.uid, self.gid, self)
-        await ix.response.edit_message(view=view)
 
 
 # ── Unregistered view ─────────────────────────────────────────────────────────

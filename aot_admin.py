@@ -5,7 +5,8 @@ from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow,
 
 from aot_bot_instance import bot
 from aot_shared import (
-    t, load_config, save_config, select_options_from_list,
+    t, load_config, save_config, load_players, save_players,
+    select_options_from_list, cv2_dm,
 )
 
 
@@ -425,10 +426,20 @@ class GrantBloodlineView(LayoutView):
         if not self.sel_bl or self.sel_bl == "__none__":
             await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
         cfg = load_config(self.gid); acc = cfg.setdefault("special_access", {})
+        newly_granted = []
         for uid in self.sel_users:
             if self.sel_bl not in acc.get(uid, []):
                 acc.setdefault(uid, []).append(self.sel_bl)
-        save_config(self.gid, cfg); self._build()
+                newly_granted.append(uid)
+        save_config(self.gid, cfg)
+        for uid in newly_granted:
+            try:
+                from aot_bot_instance import bot as _bot
+                user = await _bot.fetch_user(int(uid))
+                await cv2_dm(user, t(self.gid, "got_bloodline_dm", bloodline=self.sel_bl))
+            except Exception:
+                pass
+        self._build()
         await ix.response.edit_message(view=self)
 
     async def _grant_role(self, ix):
@@ -437,10 +448,15 @@ class GrantBloodlineView(LayoutView):
         role = ix.guild.get_role(int(self.sel_role))
         if not role: await ix.response.send_message("Role not found.", ephemeral=True); return
         cfg = load_config(self.gid); acc = cfg.setdefault("special_access", {})
+        newly_granted = []
         for m in role.members:
             if self.sel_bl not in acc.get(str(m.id), []):
                 acc.setdefault(str(m.id), []).append(self.sel_bl)
-        save_config(self.gid, cfg); self._build()
+                newly_granted.append(m)
+        save_config(self.gid, cfg)
+        for m in newly_granted:
+            await cv2_dm(m, t(self.gid, "got_bloodline_dm", bloodline=self.sel_bl))
+        self._build()
         await ix.response.edit_message(view=self)
 
     async def _revoke(self, ix):
@@ -505,54 +521,75 @@ class GrantShifterView(LayoutView):
     def __init__(self, gid, parent):
         super().__init__(timeout=300)
         self.gid = gid; self.parent = parent
-        self.sel_users = []; self.sel_role = None
+        self.sel_titan = None; self.sel_users = []
         self._build()
 
     def _build(self):
         self.clear_items()
-        us = discord.ui.UserSelect(placeholder="Select users", min_values=1, max_values=25)
-        rs = discord.ui.RoleSelect(placeholder="Grant via role")
-        gu = Button(label="Grant Users",    style=discord.ButtonStyle.green,     custom_id="gsh_gu")
-        gr = Button(label="Grant via Role", style=discord.ButtonStyle.green,     custom_id="gsh_gr")
-        rv = Button(label="Revoke Users",   style=discord.ButtonStyle.danger,    custom_id="gsh_rv")
-        bk = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="gsh_bk")
+        cfg = load_config(self.gid)
+        titans = cfg.get("shifters", [])
+
+        titan_sel = Select(placeholder="Select Titan to assign",
+                           options=select_options_from_list(titans, self.sel_titan))
+        titan_sel.callback = self._titan_cb
+
+        us = discord.ui.UserSelect(placeholder="Select users to grant", min_values=1, max_values=25)
         us.callback = self._user_cb
-        rs.callback = self._role_cb
+
+        gu = Button(label="Grant",        style=discord.ButtonStyle.green,     custom_id="gsh_gu")
+        rv = Button(label="Revoke Users", style=discord.ButtonStyle.danger,    custom_id="gsh_rv")
+        bk = Button(label=t(self.gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="gsh_bk")
         gu.callback = self._grant_u
-        gr.callback = self._grant_r
         rv.callback = self._revoke
         bk.callback = self._back
+
         self.add_item(Container(
             TextDisplay(_grant_sh_text(self.gid)),
             Separator(),
+            ActionRow(titan_sel),
             ActionRow(us),
-            ActionRow(rs),
-            ActionRow(gu, gr),
-            ActionRow(rv, bk),
+            ActionRow(gu, rv, bk),
         ))
+
+    async def _titan_cb(self, ix):
+        self.sel_titan = ix.data["values"][0]; self._build()
+        await ix.response.edit_message(view=self)
 
     async def _user_cb(self, ix): self.sel_users = ix.data["values"]; await ix.response.defer()
 
-    async def _role_cb(self, ix):
-        self.sel_role = ix.data["values"][0] if ix.data["values"] else None
-        await ix.response.defer()
-
     async def _grant_u(self, ix):
-        cfg = load_config(self.gid); acc = cfg.setdefault("shifter_access", [])
-        for uid in self.sel_users:
-            if uid not in acc: acc.append(uid)
-        save_config(self.gid, cfg); self._build()
-        await ix.response.edit_message(view=self)
-
-    async def _grant_r(self, ix):
-        if not self.sel_role:
+        import time as _t
+        if not self.sel_titan or self.sel_titan == "__none__":
             await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
-        role = ix.guild.get_role(int(self.sel_role))
-        if not role: await ix.response.send_message("Role not found.", ephemeral=True); return
-        cfg = load_config(self.gid); acc = cfg.setdefault("shifter_access", [])
-        for m in role.members:
-            if str(m.id) not in acc: acc.append(str(m.id))
-        save_config(self.gid, cfg); self._build()
+        if not self.sel_users:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        cfg = load_config(self.gid)
+        acc = cfg.setdefault("shifter_access", [])
+        players = load_players(self.gid)
+        titan_days = cfg.get("titan_time_days", 4745)
+        now = _t.time()
+        for uid in self.sel_users:
+            if uid not in acc:
+                acc.append(uid)
+            player = players.setdefault(uid, {})
+            new_power = {
+                "titan":       self.sel_titan,
+                "acquired_at": now,
+                "expires_at":  now + titan_days * 86400,
+                "abilities":   [],
+            }
+            player.setdefault("titan_powers", []).append(new_power)
+            players[uid] = player
+        save_config(self.gid, cfg)
+        save_players(self.gid, players)
+        for uid in self.sel_users:
+            try:
+                from aot_bot_instance import bot as _bot
+                user = await _bot.fetch_user(int(uid))
+                await cv2_dm(user, t(self.gid, "got_titan_dm", titan=self.sel_titan))
+            except Exception:
+                pass
+        self._build()
         await ix.response.edit_message(view=self)
 
     async def _revoke(self, ix):
@@ -584,9 +621,15 @@ class RevokeShView(LayoutView):
 
     async def _do(self, ix):
         cfg = load_config(self.gid); acc = cfg.get("shifter_access", [])
+        players = load_players(self.gid)
         for uid in self.sel_users:
             if uid in acc: acc.remove(uid)
+            player = players.get(uid, {})
+            player["titan_powers"] = []
+            player["transformed"]  = False
+            players[uid] = player
         save_config(self.gid, cfg)
+        save_players(self.gid, players)
         self.parent._build()
         await ix.response.edit_message(view=self.parent)
 
