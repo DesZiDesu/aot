@@ -1,12 +1,12 @@
 """Profile command — registration, display, inventory tab."""
 import asyncio
 import discord
-from discord.ui import View, Button, Select, Modal, TextInput
+from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput
 
 from aot_bot_instance import bot
 from aot_shared import (
     t, load_players, save_players, load_config, load_items,
-    ui_box, select_options_from_list, get_available_bloodlines,
+    select_options_from_list, get_available_bloodlines,
     has_shifter_access, assign_roles, remove_old_roles,
     format_profile_text, format_inventory_text,
 )
@@ -47,21 +47,17 @@ class RegisterModal(Modal, title="Register"):
             "appearance": self.appearance.value.strip(),
             "image":      (self.image.value or "").strip(),
         }
-        cfg       = load_config(gid)
+        cfg        = load_config(gid)
         bloodlines = get_available_bloodlines(gid, uid)
-        existing  = load_players(gid).get(str(uid), {})
+        existing   = load_players(gid).get(str(uid), {})
         view = RegisterSelectsView(gid, uid, step1, cfg, bloodlines,
                                    existing_player=existing, is_edit=bool(existing))
-        await ix.response.edit_message(
-            content=ui_box(t(gid, "profile_title"),
-                           [t(gid, "register_step2")]),
-            view=view,
-        )
+        await ix.response.edit_message(view=view)
 
 
 # ── Step 2: dropdowns ─────────────────────────────────────────────────────────
 
-class RegisterSelectsView(View):
+class RegisterSelectsView(LayoutView):
     def __init__(self, gid, uid, step1, cfg, bloodlines,
                  existing_player=None, is_edit=False):
         super().__init__(timeout=300)
@@ -71,8 +67,6 @@ class RegisterSelectsView(View):
 
         factions = cfg.get("factions", [])
         ranks    = cfg.get("ranks", [])
-        shifters = cfg.get("shifters", [])
-
         self.sel_faction   = self.existing.get("faction",   factions[0] if factions else "")
         self.sel_rank      = self.existing.get("rank",      ranks[0]    if ranks    else "")
         self.sel_bloodline = self.existing.get("bloodline", bloodlines[0] if bloodlines else "")
@@ -84,29 +78,54 @@ class RegisterSelectsView(View):
         self.clear_items()
         gid = self.gid
 
-        def _sel(placeholder_key, opts, row, cb):
-            s = Select(placeholder=t(gid, placeholder_key),
-                       options=opts, row=row)
-            s.callback = cb
-            self.add_item(s)
+        sf = Select(placeholder=t(gid, "select_faction"),
+                    options=select_options_from_list(self.cfg.get("factions", []), self.sel_faction))
+        sf.callback = self._faction_cb
 
-        _sel("select_faction",   select_options_from_list(self.cfg.get("factions",[]),   self.sel_faction),   0, self._faction_cb)
-        _sel("select_rank",      select_options_from_list(self.cfg.get("ranks",[]),      self.sel_rank),      1, self._rank_cb)
-        _sel("select_bloodline", select_options_from_list(self.bloodlines,               self.sel_bloodline), 2, self._bloodline_cb)
+        sr = Select(placeholder=t(gid, "select_rank"),
+                    options=select_options_from_list(self.cfg.get("ranks", []), self.sel_rank))
+        sr.callback = self._rank_cb
+
+        sb = Select(placeholder=t(gid, "select_bloodline"),
+                    options=select_options_from_list(self.bloodlines, self.sel_bloodline))
+        sb.callback = self._bloodline_cb
+
+        confirm = Button(label=t(gid, "confirm_btn"), style=discord.ButtonStyle.green, custom_id="reg_confirm")
+        confirm.callback = self._confirm
+
+        container_children = [
+            TextDisplay(f"**{t(gid,'profile_title')}**\n\n{t(gid,'register_step2')}"),
+            Separator(),
+            ActionRow(sf),
+            ActionRow(sr),
+            ActionRow(sb),
+        ]
 
         if self.show_shifter:
-            shifter_opts = select_options_from_list(
-                ["None"] + self.cfg.get("shifters", []), self.sel_shifter)
-            _sel("select_shifter", shifter_opts, 3, self._shifter_cb)
+            ss = Select(placeholder=t(gid, "select_shifter"),
+                        options=select_options_from_list(
+                            ["None"] + self.cfg.get("shifters", []), self.sel_shifter))
+            ss.callback = self._shifter_cb
+            container_children.append(ActionRow(ss))
 
-        btn = Button(label=t(gid, "confirm_btn"), style=discord.ButtonStyle.green, row=4)
-        btn.callback = self._confirm
-        self.add_item(btn)
+        container_children.append(ActionRow(confirm))
+        self.add_item(Container(*container_children))
 
-    async def _faction_cb(self, ix): self.sel_faction = ix.data["values"][0]; self._build(); await ix.response.edit_message(view=self)
-    async def _rank_cb(self, ix):    self.sel_rank    = ix.data["values"][0]; self._build(); await ix.response.edit_message(view=self)
-    async def _bloodline_cb(self, ix): self.sel_bloodline = ix.data["values"][0]; self._build(); await ix.response.edit_message(view=self)
-    async def _shifter_cb(self, ix): self.sel_shifter = ix.data["values"][0]; self._build(); await ix.response.edit_message(view=self)
+    async def _faction_cb(self, ix):
+        self.sel_faction = ix.data["values"][0]; self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _rank_cb(self, ix):
+        self.sel_rank = ix.data["values"][0]; self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _bloodline_cb(self, ix):
+        self.sel_bloodline = ix.data["values"][0]; self._build()
+        await ix.response.edit_message(view=self)
+
+    async def _shifter_cb(self, ix):
+        self.sel_shifter = ix.data["values"][0]; self._build()
+        await ix.response.edit_message(view=self)
 
     async def _confirm(self, ix: discord.Interaction):
         gid, uid = self.gid, self.uid
@@ -115,17 +134,17 @@ class RegisterSelectsView(View):
         old     = players.get(str(uid), {})
 
         player = {**self.step1,
-                  "faction":   self.sel_faction,
-                  "rank":      self.sel_rank,
-                  "bloodline": self.sel_bloodline,
-                  "shifter":   self.sel_shifter if self.show_shifter else old.get("shifter","None"),
-                  "inventory": old.get("inventory", {}),
+                  "faction":    self.sel_faction,
+                  "rank":       self.sel_rank,
+                  "bloodline":  self.sel_bloodline,
+                  "shifter":    self.sel_shifter if self.show_shifter else old.get("shifter", "None"),
+                  "inventory":  old.get("inventory", {}),
                   "titan_powers": old.get("titan_powers", []),
                   "stamina":    old.get("stamina", 100),
-                  "max_stamina":old.get("max_stamina", 100),
+                  "max_stamina": old.get("max_stamina", 100),
                   "ability_cooldowns": old.get("ability_cooldowns", {}),
                   "transformed": False,
-                  "deceased": old.get("deceased", False)}
+                  "deceased":   old.get("deceased", False)}
         players[str(uid)] = player
         save_players(gid, players)
 
@@ -136,63 +155,77 @@ class RegisterSelectsView(View):
             await assign_roles(member, player, cfg)
 
         name = ix.user.display_name
-        profile_text = format_profile_text(player, name, gid)
-        from aot_profile import ProfileView
-        await ix.response.edit_message(content=profile_text, view=ProfileView(uid, gid))
+        view = ProfileView(uid, gid, name)
+        await ix.response.edit_message(view=view)
 
         action = "updated_msg" if self.is_edit else "registered_msg"
         try:
             msg = await ix.channel.send(t(gid, action, name=name, char=player["name"]))
             await asyncio.sleep(30)
             await msg.delete()
-        except Exception: pass
+        except Exception:
+            pass
         try:
             dm = await ix.user.create_dm()
+            profile_text = format_profile_text(player, name, gid)
             await dm.send(t(gid, "dm_profile", profile=profile_text))
-        except Exception: pass
+        except Exception:
+            pass
 
 
 # ── Profile view (tabs) ───────────────────────────────────────────────────────
 
-class ProfileView(View):
-    def __init__(self, user_id: int, guild_id: int):
+class ProfileView(LayoutView):
+    def __init__(self, user_id: int, guild_id: int, display_name: str = ""):
         super().__init__(timeout=300)
         self.uid = user_id; self.gid = guild_id
+        self.display_name = display_name
         self._build()
 
     def _build(self):
         self.clear_items()
         gid = self.gid
-
-        def _btn(key, style, cb, row=0):
-            b = Button(label=t(gid, key), style=style, row=row)
-            b.callback = cb
-            self.add_item(b)
-
-        _btn("profile_btn",   discord.ButtonStyle.primary,   self._profile_tab)
-        _btn("inventory_btn", discord.ButtonStyle.secondary, self._inventory_tab)
-        _btn("edit_btn",      discord.ButtonStyle.secondary, self._edit)
-
-        # Show transform button only if user has titan powers
         players = load_players(gid)
         player  = players.get(str(self.uid), {})
+        text = format_profile_text(player, self.display_name or "Character", gid)
+
+        pb = Button(label=t(gid, "profile_btn"),   style=discord.ButtonStyle.primary,   custom_id="pf_profile")
+        pb.callback = self._profile_tab
+        ib = Button(label=t(gid, "inventory_btn"), style=discord.ButtonStyle.secondary, custom_id="pf_inventory")
+        ib.callback = self._inventory_tab
+        eb = Button(label=t(gid, "edit_btn"),      style=discord.ButtonStyle.secondary, custom_id="pf_edit")
+        eb.callback = self._edit
+
+        rows = [ActionRow(pb, ib, eb)]
+
         if player.get("titan_powers"):
-            tb = Button(label=t(gid, "transform_btn"), style=discord.ButtonStyle.danger, row=1)
+            tb = Button(label=t(gid, "transform_btn"), style=discord.ButtonStyle.danger, custom_id="pf_transform")
             tb.callback = self._transform
-            self.add_item(tb)
+            rows.append(ActionRow(tb))
+
+        self.add_item(Container(TextDisplay(text), Separator(), *rows))
 
     async def _profile_tab(self, ix: discord.Interaction):
-        player = load_players(self.gid).get(str(self.uid), {})
-        await ix.response.edit_message(
-            content=format_profile_text(player, ix.user.display_name, self.gid),
-            view=self)
+        self.display_name = ix.user.display_name
+        self._build()
+        await ix.response.edit_message(view=self)
 
     async def _inventory_tab(self, ix: discord.Interaction):
+        self.clear_items()
         player = load_players(self.gid).get(str(self.uid), {})
         items  = load_items(self.gid)
-        await ix.response.edit_message(
-            content=format_inventory_text(player, items, self.gid),
-            view=self)
+        text   = format_inventory_text(player, items, self.gid)
+        gid = self.gid
+
+        pb = Button(label=t(gid, "profile_btn"),   style=discord.ButtonStyle.secondary, custom_id="pf_profile")
+        pb.callback = self._profile_tab
+        ib = Button(label=t(gid, "inventory_btn"), style=discord.ButtonStyle.primary,   custom_id="pf_inventory")
+        ib.callback = self._inventory_tab
+        eb = Button(label=t(gid, "edit_btn"),      style=discord.ButtonStyle.secondary, custom_id="pf_edit")
+        eb.callback = self._edit
+
+        self.add_item(Container(TextDisplay(text), Separator(), ActionRow(pb, ib, eb)))
+        await ix.response.edit_message(view=self)
 
     async def _edit(self, ix: discord.Interaction):
         if ix.user.id != self.uid:
@@ -204,22 +237,23 @@ class ProfileView(View):
         if ix.user.id != self.uid:
             await ix.response.send_message(t(self.gid, "not_your_profile"), ephemeral=True); return
         from aot_shifter import TransformView
-        player = load_players(self.gid).get(str(self.uid), {})
         view = TransformView(self.uid, self.gid, self)
-        await ix.response.edit_message(
-            content=ui_box(t(self.gid, "transform_btn"), ["⚔️"]),
-            view=view)
+        await ix.response.edit_message(view=view)
 
 
 # ── Unregistered view ─────────────────────────────────────────────────────────
 
-class UnregisteredView(View):
+class UnregisteredView(LayoutView):
     def __init__(self, guild_id: int):
         super().__init__(timeout=300)
         self.gid = guild_id
-        b = Button(label=t(guild_id, "register_btn"), style=discord.ButtonStyle.green)
-        b.callback = self._register
-        self.add_item(b)
+        rb = Button(label=t(guild_id, "register_btn"), style=discord.ButtonStyle.green, custom_id="unreg_register")
+        rb.callback = self._register
+        self.add_item(Container(
+            TextDisplay(f"**{t(guild_id,'profile_title')}**\n\n{t(guild_id,'not_registered')}"),
+            Separator(),
+            ActionRow(rb),
+        ))
 
     async def _register(self, ix: discord.Interaction):
         await ix.response.send_modal(RegisterModal(self.gid))
@@ -232,10 +266,6 @@ async def profile_cmd(ix: discord.Interaction):
     gid = ix.guild_id; uid = ix.user.id
     player = load_players(gid).get(str(uid))
     if not player:
-        await ix.response.send_message(
-            content=ui_box(t(gid, "profile_title"), [t(gid, "not_registered")]),
-            view=UnregisteredView(gid), ephemeral=True)
+        await ix.response.send_message(view=UnregisteredView(gid), ephemeral=True)
     else:
-        await ix.response.send_message(
-            content=format_profile_text(player, ix.user.display_name, gid),
-            view=ProfileView(uid, gid), ephemeral=True)
+        await ix.response.send_message(view=ProfileView(uid, gid, ix.user.display_name), ephemeral=True)

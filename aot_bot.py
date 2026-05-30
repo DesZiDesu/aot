@@ -12,7 +12,7 @@ def _ensure(*pkgs):
         except ImportError:
             subprocess.run([sys.executable,"-m","pip","install",p,"--quiet"],check=False)
 
-_ensure("discord.py>=2.3")
+_ensure("discord.py>=2.6")
 
 # Import modules — their decorators register all commands onto bot
 from aot_bot_instance import bot

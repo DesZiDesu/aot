@@ -288,14 +288,6 @@ def has_shifter_access(guild_id: int, user_id: int) -> bool:
     return str(user_id) in cfg.get("shifter_access", [])
 
 
-# ── UI Border ─────────────────────────────────────────────────────────────────
-
-def ui_box(title: str, lines: list) -> str:
-    """Wrap content in an AOT-style Unicode border."""
-    top = f"╔══〔 {title} 〕"
-    body = "\n".join(f"┃  {line}" for line in lines)
-    bot = "╚" + "═" * (len(top) - 1)
-    return f"{top}\n┃\n{body}\n┃\n{bot}"
 
 
 # ── Role helpers ──────────────────────────────────────────────────────────────
@@ -376,7 +368,7 @@ def format_profile_text(player: dict, display_name: str, guild_id: int) -> str:
     if img_line:
         lines.append(img_line.strip())
 
-    return ui_box(f"📋 {t(guild_id,'profile_title')} — {display_name}", lines)
+    return f"**📋 {t(guild_id,'profile_title')} — {display_name}**\n\n" + "\n".join(lines)
 
 
 def format_inventory_text(player: dict, items_data: dict, guild_id: int) -> str:
@@ -385,8 +377,9 @@ def format_inventory_text(player: dict, items_data: dict, guild_id: int) -> str:
     cat_order  = items_data.get("category_order", [])
     all_items  = items_data.get("items", {})
 
+    header = f"**🎒 {t(guild_id,'inventory_btn')}**"
     if not inventory:
-        return ui_box(f"🎒 {t(guild_id,'inventory_btn')}", [t(guild_id, "inventory_empty")])
+        return header + "\n\n" + t(guild_id, "inventory_empty")
 
     grouped: dict = {}
     uncategorized = []
@@ -412,4 +405,4 @@ def format_inventory_text(player: dict, items_data: dict, guild_id: int) -> str:
         for item, qty in uncategorized:
             lines.append(f"  {item.get('emoji','📦')} {item.get('name','?')} × {qty}")
 
-    return ui_box(f"🎒 {t(guild_id,'inventory_btn')}", lines or [t(guild_id, "inventory_empty")])
+    return header + "\n\n" + ("\n".join(lines) if lines else t(guild_id, "inventory_empty"))
