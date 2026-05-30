@@ -176,7 +176,7 @@ class ProfileView(LayoutView):
         emblem_url = RANK_EMBLEMS.get(rank, "")
         char_img = player.get("image", "").strip()
 
-        pb = Button(label=t(gid, "profile_btn"),   style=discord.ButtonStyle.primary,   custom_id="pf_profile")
+        pb = Button(label=t(gid, "show_profile_btn"), style=discord.ButtonStyle.primary,   custom_id="pf_profile")
         pb.callback = self._profile_tab
         ib = Button(label=t(gid, "inventory_btn"), style=discord.ButtonStyle.secondary, custom_id="pf_inventory")
         ib.callback = self._inventory_tab
@@ -197,9 +197,35 @@ class ProfileView(LayoutView):
         self.add_item(Container(*container_children))
 
     async def _profile_tab(self, ix: discord.Interaction):
-        self.display_name = ix.user.display_name
-        self._build()
-        await ix.response.edit_message(view=self)
+        gid = self.gid
+        players = load_players(gid)
+        player  = players.get(str(self.uid), {})
+        text = format_profile_text(player, self.display_name or "Character", gid)
+
+        rank = player.get("rank", "")
+        emblem_url = RANK_EMBLEMS.get(rank, "")
+        char_img = player.get("image", "").strip()
+
+        full_text = f"<@{self.uid}>\n{text}"
+
+        if emblem_url:
+            main_block = Section(TextDisplay(full_text), accessory=Thumbnail(media=emblem_url))
+        else:
+            main_block = TextDisplay(full_text)
+
+        container_children = [main_block]
+        if char_img and is_url(char_img):
+            container_children.append(Separator())
+            container_children.append(MediaGallery(MediaGalleryItem(media=char_img)))
+
+        pub_view = LayoutView(timeout=None)
+        pub_view.add_item(Container(*container_children))
+
+        await ix.response.defer(ephemeral=True)
+        try:
+            await ix.channel.send(view=pub_view)
+        except Exception:
+            pass
 
     async def _inventory_tab(self, ix: discord.Interaction):
         from aot_items import InventoryView
