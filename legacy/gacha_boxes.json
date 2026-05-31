@@ -1,0 +1,37 @@
+{
+  "boxes": [
+    {
+      "id": "starter_box",
+      "name": "กล่องเริ่มต้น",
+      "emoji": "📦",
+      "icon_url": "",
+      "description": "กล่องสุ่มของเล็กๆ น้อยๆ สำหรับผู้เล่นใหม่",
+      "ticket_item_id": "starter_ticket",
+      "rolls_per_use": 3,
+      "qty_min": 1,
+      "qty_max": 2,
+      "pool": [
+        {
+          "item_id": "stone",
+          "weight": 50,
+          "rarity": "common"
+        },
+        {
+          "item_id": "wood",
+          "weight": 50,
+          "rarity": "common"
+        },
+        {
+          "item_id": "herb",
+          "weight": 20,
+          "rarity": "uncommon"
+        },
+        {
+          "item_id": "iron_ore",
+          "weight": 5,
+          "rarity": "rare"
+        }
+      ]
+    }
+  ]
+}
