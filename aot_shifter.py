@@ -69,13 +69,25 @@ def _abilities_text(gid, player, titan_name, power):
 
 # ── CV2 public channel announcements ──────────────────────────────────────────
 
-async def _send_transform_cv2(channel, gid, hide_name, uid, titan_name):
+async def _send_transform_cv2(channel, gid, hide_name, uid, titan_name, power=None):
     if hide_name:
         text = t(gid, "transform_hidden")
     else:
-        text = t(gid, "transform_public", name=f"<@{uid}>", titan=titan_name)
+        display = titan_name
+        if power:
+            display = power.get("display_name") or titan_name
+        text = t(gid, "transform_public", name=f"<@{uid}>", titan=display)
+    custom_desc  = (power or {}).get("custom_desc", "")
+    custom_image = (power or {}).get("custom_image", "")
+    if custom_desc:
+        text += f"\n\n*{custom_desc}*"
+
     v = LayoutView(timeout=None)
-    v.add_item(Container(TextDisplay(text)))
+    children = [TextDisplay(text)]
+    if custom_image and is_url(custom_image):
+        children.append(Separator())
+        children.append(MediaGallery(MediaGalleryItem(media=custom_image)))
+    v.add_item(Container(*children))
     try:
         await channel.send(view=v)
     except Exception:
@@ -122,6 +134,26 @@ async def _send_ability_cv2(channel, gid, hide_name, uid, ability, stamina, max_
 
 
 # ── Admin stamina notification ────────────────────────────────────────────────
+
+async def _send_grab_cv2(channel, gid, name, target_name):
+    text = t(gid, "shifter_grab_msg", name=name, target=target_name)
+    v = LayoutView(timeout=None)
+    v.add_item(Container(TextDisplay(text)))
+    try: await channel.send(view=v)
+    except Exception: pass
+
+
+async def _send_eat_cv2(channel, gid, eater_name, target_name, got_titan=None):
+    if got_titan:
+        text = t(gid, "shifter_ate_shifter_msg",
+                 eater=eater_name, target=target_name, titan=got_titan)
+    else:
+        text = t(gid, "shifter_ate_normal_msg", eater=eater_name, target=target_name)
+    v = LayoutView(timeout=None)
+    v.add_item(Container(TextDisplay(text)))
+    try: await channel.send(view=v)
+    except Exception: pass
+
 
 async def _notify_admins_stamina(guild, uid, player, gid):
     if not guild: return
@@ -296,7 +328,12 @@ class ShifterMainView(LayoutView):
         refresh_b.callback   = self._refresh
 
         container_children.append(ActionRow(hide_btn, transform_b))
+        upgrade_b  = Button(label=t(gid, "upgrade_ability_btn"),  style=discord.ButtonStyle.secondary, custom_id="sh_upgrade")
+        customize_b = Button(label=t(gid, "customize_form_btn"), style=discord.ButtonStyle.secondary, custom_id="sh_custom")
+        upgrade_b.callback   = self._upgrade
+        customize_b.callback = self._customize
         container_children.append(ActionRow(moveset_b, refresh_b))
+        container_children.append(ActionRow(upgrade_b, customize_b))
         self.add_item(Container(*container_children))
 
     def _build_transformed(self, player, power):
@@ -324,15 +361,20 @@ class ShifterMainView(LayoutView):
         moveset_b = Button(label=t(gid, "edit_moveset_btn"), style=discord.ButtonStyle.secondary, custom_id="sh_moveset2")
         deform_b  = Button(label=t(gid, "detransform_btn"),  style=discord.ButtonStyle.secondary, custom_id="sh_deform")
         refresh_b = Button(label="🔄 Refresh",               style=discord.ButtonStyle.secondary, custom_id="sh_refresh2")
+        grab_b    = Button(label=t(gid, "grab_btn"),          style=discord.ButtonStyle.secondary, custom_id="sh_grab")
+        eat_b     = Button(label=t(gid, "eat_btn"),           style=discord.ButtonStyle.danger,    custom_id="sh_eat")
         use_b.callback     = self._use
         moveset_b.callback = self._open_moveset
         deform_b.callback  = self._deform
         refresh_b.callback = self._refresh
+        grab_b.callback    = self._grab
+        eat_b.callback     = self._eat
 
         self.add_item(Container(
             TextDisplay(text), Separator(),
             ActionRow(sel),
             ActionRow(use_b, moveset_b),
+            ActionRow(grab_b, eat_b),
             ActionRow(deform_b, refresh_b),
         ))
 
@@ -380,7 +422,7 @@ class ShifterMainView(LayoutView):
         save_players(self.gid, players)
         self._build()
         await ix.response.edit_message(view=self)
-        await _send_transform_cv2(ix.channel, self.gid, self.hide_name, self.uid, self.sel_titan)
+        await _send_transform_cv2(ix.channel, self.gid, self.hide_name, self.uid, self.sel_titan, power)
 
     async def _deform(self, ix: discord.Interaction):
         players = load_players(self.gid); player = players.get(str(self.uid), {})
@@ -451,6 +493,320 @@ class ShifterMainView(LayoutView):
         if not power:
             await ix.response.send_message(t(self.gid, "no_titan_power"), ephemeral=True); return
         await ix.response.edit_message(view=MovesetEditorView(self.uid, self.gid, self.sel_titan, power, self))
+
+    async def _upgrade(self, ix: discord.Interaction):
+        players = load_players(self.gid); player = players.get(str(self.uid), {})
+        power = next((p for p in player.get("titan_powers", []) if p["titan"] == self.sel_titan), None)
+        if not power:
+            await ix.response.send_message(t(self.gid, "no_titan_power"), ephemeral=True); return
+        await ix.response.edit_message(view=UpgradeAbilityView(self.uid, self.gid, self.sel_titan, power, self))
+
+    async def _customize(self, ix: discord.Interaction):
+        players = load_players(self.gid); player = players.get(str(self.uid), {})
+        power = next((p for p in player.get("titan_powers", []) if p["titan"] == self.sel_titan), None)
+        if not power:
+            await ix.response.send_message(t(self.gid, "no_titan_power"), ephemeral=True); return
+        await ix.response.send_modal(CustomizeFormModal(self.uid, self.gid, self.sel_titan, self))
+
+    async def _grab(self, ix: discord.Interaction):
+        await ix.response.edit_message(view=ShifterTargetView(self.uid, self.gid, "grab", self))
+
+    async def _eat(self, ix: discord.Interaction):
+        await ix.response.edit_message(view=ShifterTargetView(self.uid, self.gid, "eat", self))
+
+
+# ── Upgrade Ability View ─────────────────────────────────────────────────────
+
+class UpgradeAbilityView(LayoutView):
+    def __init__(self, uid, gid, titan_name, power, parent):
+        super().__init__(timeout=300)
+        self.uid = uid; self.gid = gid; self.titan_name = titan_name
+        self.power = power or {}; self.parent = parent; self.sel = None
+        self._build()
+
+    def _build(self):
+        self.clear_items()
+        abilities = self.power.get("abilities", [])
+        opts = ([discord.SelectOption(label=a["name"][:100], value=a["name"])
+                 for a in abilities[:25] if a.get("confirmed", True)]
+                or [discord.SelectOption(label="No abilities", value="__none__")])
+        sel = Select(placeholder="Select ability to upgrade", options=opts)
+        sel.callback = self._sel
+
+        cd_btn   = Button(label=t(self.gid, "upgrade_cd_btn"),   style=discord.ButtonStyle.primary,   custom_id="ua_cd")
+        cost_btn = Button(label=t(self.gid, "upgrade_cost_btn"), style=discord.ButtonStyle.secondary, custom_id="ua_cost")
+        bk_btn   = Button(label=t(self.gid, "back_btn"),          style=discord.ButtonStyle.secondary, custom_id="ua_bk")
+        cd_btn.callback   = self._upgrade_cd
+        cost_btn.callback = self._upgrade_cost
+        bk_btn.callback   = self._back
+
+        text = f"**{t(self.gid,'upgrade_title')}**\n\n"
+        if self.sel:
+            ab = next((a for a in abilities if a["name"] == self.sel), {})
+            cfg = load_config(self.gid)
+            text += (f"Selected: **{self.sel}**\n"
+                     f"Cooldown: {ab.get('cooldown_minutes',0)}m | "
+                     f"Stamina Cost: {ab.get('stamina_cost',0)}\n\n"
+                     f"Reduce CD (-5m): 200 {cfg.get('currency_name','Coins')}\n"
+                     f"Reduce Cost (-5): 150 {cfg.get('currency_name','Coins')}")
+        else:
+            text += "Select an ability to upgrade."
+
+        self.add_item(Container(
+            ActionRow(bk_btn), Separator(),
+            TextDisplay(text), Separator(),
+            ActionRow(sel),
+            ActionRow(cd_btn, cost_btn),
+        ))
+
+    async def _sel(self, ix):
+        self.sel = ix.data["values"][0] if ix.data["values"][0] != "__none__" else None
+        self._build(); await ix.response.edit_message(view=self)
+
+    async def _upgrade_cd(self, ix: discord.Interaction):
+        if not self.sel:
+            await ix.response.send_message("Select an ability first.", ephemeral=True); return
+        await self._do_upgrade(ix, "cd", cost=200, amount=5)
+
+    async def _upgrade_cost(self, ix: discord.Interaction):
+        if not self.sel:
+            await ix.response.send_message("Select an ability first.", ephemeral=True); return
+        await self._do_upgrade(ix, "cost", cost=150, amount=5)
+
+    async def _do_upgrade(self, ix: discord.Interaction, kind: str, cost: int, amount: int):
+        from aot_shared import format_currency
+        players = load_players(self.gid); player = players.get(str(self.uid), {})
+        cfg     = load_config(self.gid)
+        balance = player.get("balance", 0)
+        if balance < cost:
+            await ix.response.send_message(
+                t(self.gid, "upgrade_not_enough",
+                  cost=format_currency(cost, cfg)), ephemeral=True); return
+        player["balance"] = balance - cost
+        for pw in player.get("titan_powers", []):
+            if pw["titan"] == self.titan_name:
+                for ab in pw.get("abilities", []):
+                    if ab["name"] == self.sel:
+                        if kind == "cd":
+                            ab["cooldown_minutes"] = max(0, ab.get("cooldown_minutes", 0) - amount)
+                        else:
+                            ab["stamina_cost"] = max(0, ab.get("stamina_cost", 0) - amount)
+                        break
+        players[str(self.uid)] = player
+        save_players(self.gid, players)
+        from aot_shared import log_event
+        await log_event(bot, self.gid, "shifter",
+                        f"<@{self.uid}> upgraded ability '{self.sel}' ({kind})")
+        self.power = next((p for p in player.get("titan_powers", []) if p["titan"] == self.titan_name), self.power)
+        self._build(); await ix.response.edit_message(view=self)
+        await ix.followup.send(t(self.gid, "upgrade_done"), ephemeral=True)
+
+    async def _back(self, ix):
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+
+
+# ── Customize Form Modal ──────────────────────────────────────────────────────
+
+class CustomizeFormModal(Modal, title="Customize Titan Form"):
+    f_name  = TextInput(label="Display Name (empty = titan name)", max_length=60,  required=False)
+    f_image = TextInput(label="Image URL (optional)",              max_length=300, required=False)
+    f_desc  = TextInput(label="Form Description (optional)",       style=discord.TextStyle.paragraph,
+                        max_length=300, required=False)
+
+    def __init__(self, uid, gid, titan_name, parent):
+        super().__init__()
+        self.uid = uid; self.gid = gid; self.titan_name = titan_name; self.parent = parent
+        self.f_name.label  = t(gid, "form_display_name_field")
+        self.f_image.label = t(gid, "form_image_field")
+        self.f_desc.label  = t(gid, "form_desc_field")
+        players = load_players(gid); player = players.get(str(uid), {})
+        power = next((p for p in player.get("titan_powers", []) if p["titan"] == titan_name), {})
+        self.f_name.default  = power.get("display_name", "")
+        self.f_image.default = power.get("custom_image", "")
+        self.f_desc.default  = power.get("custom_desc", "")
+
+    async def on_submit(self, ix: discord.Interaction):
+        players = load_players(self.gid); player = players.get(str(self.uid), {})
+        for pw in player.get("titan_powers", []):
+            if pw["titan"] == self.titan_name:
+                pw["display_name"]  = (self.f_name.value or "").strip()
+                pw["custom_image"]  = (self.f_image.value or "").strip()
+                pw["custom_desc"]   = (self.f_desc.value or "").strip()
+                break
+        save_players(self.gid, players)
+        from aot_shared import log_event
+        await log_event(bot, self.gid, "shifter",
+                        f"<@{self.uid}> customized form for '{self.titan_name}'")
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+        await ix.followup.send(t(self.gid, "form_saved"), ephemeral=True)
+
+
+# ── Shifter Grab / Eat Target View ────────────────────────────────────────────
+
+class ShifterTargetView(LayoutView):
+    def __init__(self, uid, gid, action, parent):
+        super().__init__(timeout=300)
+        self.uid = uid; self.gid = gid; self.action = action; self.parent = parent
+        usr_sel = discord.ui.UserSelect(placeholder=t(gid, "select_target"))
+        usr_sel.callback = self._pick
+        bk = Button(label=t(gid, "back_btn"), style=discord.ButtonStyle.secondary, custom_id="stv_bk")
+        bk.callback = self._back
+        self.add_item(Container(
+            ActionRow(bk), Separator(),
+            TextDisplay(f"**{action.title()}** — {t(gid,'select_target')}"),
+            ActionRow(usr_sel),
+        ))
+
+    async def _pick(self, ix: discord.Interaction):
+        target_id   = int(ix.data["values"][0])
+        eater_name  = ix.user.display_name
+        target_name = f"<@{target_id}>"
+
+        if self.action == "grab":
+            await _send_grab_cv2(ix.channel, self.gid, eater_name, target_name)
+            from aot_shared import log_event
+            await log_event(bot, self.gid, "shifter", f"{eater_name} grabbed {target_name}")
+            self.parent._build(); await ix.response.edit_message(view=self.parent)
+            return
+
+        # eat action
+        players      = load_players(self.gid)
+        target_player = players.get(str(target_id), {})
+        titan_powers  = target_player.get("titan_powers", [])
+        has_shift     = has_shifter_access(self.gid, target_id)
+
+        for g in bot.guilds:
+            if g.id == self.gid:
+                member = g.get_member(target_id)
+                if member:
+                    eat_view = ShifterEatConsentView(
+                        self.gid, self.uid, target_id, ix.channel_id,
+                        has_titan=(bool(titan_powers) and has_shift))
+                    try:
+                        dm = await member.create_dm()
+                        await dm.send(
+                            view=eat_view,
+                            content=t(self.gid, "shifter_eat_ask_body", eater=eater_name))
+                    except Exception:
+                        pass
+                break
+
+        pub_text = f"**{eater_name}** is trying to eat **{target_name}**..."
+        v = LayoutView(timeout=None)
+        v.add_item(Container(TextDisplay(pub_text)))
+        try: await ix.channel.send(view=v)
+        except Exception: pass
+
+        from aot_shared import log_event
+        await log_event(bot, self.gid, "shifter", f"{eater_name} tried to eat {target_name}")
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+
+    async def _back(self, ix):
+        self.parent._build(); await ix.response.edit_message(view=self.parent)
+
+
+class ShifterEatConsentView(LayoutView):
+    def __init__(self, gid, eater_uid, target_uid, channel_id, has_titan=False):
+        super().__init__(timeout=86400)
+        self.gid = gid; self.eater_uid = eater_uid; self.target_uid = target_uid
+        self.channel_id = channel_id; self.has_titan = has_titan
+        accept_btn  = Button(label=t(gid, "mindless_eat_accept_btn"),
+                             style=discord.ButtonStyle.green,  custom_id="sec_acc")
+        decline_btn = Button(label=t(gid, "mindless_eat_decline_btn"),
+                             style=discord.ButtonStyle.danger, custom_id="sec_dec")
+        accept_btn.callback  = self._accept
+        decline_btn.callback = self._decline
+        self.add_item(Container(
+            TextDisplay("**A Titan Shifter is trying to eat you!**"),
+            Separator(), ActionRow(accept_btn, decline_btn),
+        ))
+
+    async def _accept(self, ix: discord.Interaction):
+        if ix.user.id != self.target_uid:
+            await ix.response.send_message("This is not for you.", ephemeral=True); return
+        players       = load_players(self.gid)
+        eater_name    = f"<@{self.eater_uid}>"
+        target_name   = f"<@{self.target_uid}>"
+        target_player  = players.get(str(self.target_uid), {})
+        titan_powers   = target_player.get("titan_powers", [])
+        got_titan      = None
+
+        if self.has_titan and titan_powers:
+            cfg = load_config(self.gid); now = time.time()
+            eater_player = players.get(str(self.eater_uid), {})
+            if eater_player:
+                for power in titan_powers:
+                    titan_name = power["titan"]
+                    new_power  = {
+                        "titan": titan_name, "acquired_at": now,
+                        "expires_at": now + cfg.get("titan_time_days", 4745) * 86400,
+                        "abilities": power.get("abilities", []),
+                    }
+                    eater_player.setdefault("titan_powers", []).append(new_power)
+                    got_titan = titan_name
+                target_player["titan_powers"] = []
+                sa = cfg.get("shifter_access", [])
+                if str(self.target_uid) in sa:
+                    sa.remove(str(self.target_uid))
+                if str(self.eater_uid) not in sa:
+                    sa.append(str(self.eater_uid))
+                cfg["shifter_access"] = sa
+                from aot_shared import save_config
+                save_config(self.gid, cfg)
+                players[str(self.eater_uid)] = eater_player
+                await cv2_dm(players.get(str(self.eater_uid), {}) and
+                             (lambda: None)() or ix.user,
+                             t(self.gid, "mindless_power_guide", titan=got_titan))
+
+        players[str(self.target_uid)] = target_player
+        save_players(self.gid, players)
+
+        for g in bot.guilds:
+            if g.id == self.gid:
+                ch = g.get_channel(self.channel_id)
+                if ch:
+                    await _send_eat_cv2(ch, self.gid, eater_name, target_name, got_titan)
+                break
+        from aot_shared import log_event
+        await log_event(bot, self.gid, "shifter",
+                        f"{eater_name} ate {target_name}" + (f" (got {got_titan})" if got_titan else ""))
+        self.clear_items()
+        self.add_item(Container(TextDisplay("You have been eaten." + (f" Your titan power was transferred." if got_titan else ""))))
+        await ix.response.edit_message(view=self)
+
+    async def _decline(self, ix: discord.Interaction):
+        if ix.user.id != self.target_uid:
+            await ix.response.send_message("This is not for you.", ephemeral=True); return
+        await ix.response.send_modal(_ShifterEatRefuseModal(self.gid, self.eater_uid, self.target_uid,
+                                                              self.channel_id, self))
+
+
+class _ShifterEatRefuseModal(Modal, title="Refuse"):
+    f_reason = TextInput(label="Reason", style=discord.TextStyle.paragraph,
+                         max_length=200, required=False)
+
+    def __init__(self, gid, eater_uid, target_uid, channel_id, parent):
+        super().__init__()
+        self.gid = gid; self.eater_uid = eater_uid; self.target_uid = target_uid
+        self.channel_id = channel_id; self.parent = parent
+        self.f_reason.label = t(gid, "eat_reason_field")
+
+    async def on_submit(self, ix: discord.Interaction):
+        reason = self.f_reason.value.strip() or "No reason given"
+        msg    = t(self.gid, "mindless_eat_refused",
+                   target=f"<@{self.target_uid}>", reason=reason)
+        for g in bot.guilds:
+            if g.id == self.gid:
+                ch = g.get_channel(self.channel_id)
+                if ch:
+                    v = LayoutView(timeout=None)
+                    v.add_item(Container(TextDisplay(msg)))
+                    try: await ch.send(view=v)
+                    except Exception: pass
+                break
+        self.parent.clear_items()
+        self.parent.add_item(Container(TextDisplay("Refused.")))
+        await ix.response.edit_message(view=self.parent)
 
 
 # ── Moveset Editor ────────────────────────────────────────────────────────────
@@ -716,12 +1072,20 @@ async def check_titan_expiry():
             players[uid] = player; changed = True
 
             eligible = []
+            inheritance_races = cfg.get("inheritance_races", [])
             for mid, mp in players.items():
                 if mid == uid or mp.get("deceased"): continue
-                if mp.get("faction") in cfg.get("factions", []):
-                    if mp.get("bloodline") in (cfg.get("bloodlines_common", []) + cfg.get("bloodlines_special", [])):
-                        member = guild.get_member(int(mid))
-                        if member: eligible.append((mid, mp, member))
+                bloodline = mp.get("bloodline", "")
+                if inheritance_races:
+                    if bloodline not in inheritance_races:
+                        continue
+                else:
+                    if mp.get("faction") not in cfg.get("factions", []):
+                        continue
+                    if bloodline not in (cfg.get("bloodlines_common", []) + cfg.get("bloodlines_special", [])):
+                        continue
+                member = guild.get_member(int(mid))
+                if member: eligible.append((mid, mp, member))
 
             for titan in titan_names:
                 new_owner_data = random.choice(eligible) if eligible else None
