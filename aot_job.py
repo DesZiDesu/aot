@@ -6,7 +6,7 @@ from discord.ext import tasks
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, load_players, save_players,
     load_jobs, save_jobs, format_currency, cv2_dm, log_event,
@@ -29,6 +29,7 @@ def _is_admin():
 async def passive_income_task():
     now = time.time()
     for guild in bot.guilds:
+        if guild.id != GUILD2_ID: continue
         gid     = guild.id
         db      = load_jobs(gid)
         players = load_players(gid)
@@ -67,9 +68,11 @@ def start_job_tasks():
 
 # ── on_message for RP job mode ────────────────────────────────────────────────
 
-@bot.event
-async def on_message(message: discord.Message):
+@bot.listen('on_message')
+async def aot_job_on_message(message: discord.Message):
     if message.author.bot or not message.guild:
+        return
+    if message.guild.id != GUILD2_ID:
         return
     gid = message.guild.id
     db  = load_jobs(gid)
@@ -214,9 +217,9 @@ class JobListView(LayoutView):
         await ix.response.edit_message(view=self)
 
 
-@bot.tree.command(name="job", description="Browse and apply for jobs",
-                  description_localizations={"th": "ดูงานและสมัครงาน"})
+@bot.tree.command(name="job", description="Browse and apply for jobs", guild=GUILD2_OBJ)
 async def job_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=JobListView(ix.guild_id, ix.user.id), ephemeral=True)
 
 
@@ -337,8 +340,9 @@ class JobOwnerView(LayoutView):
 
 @bot.tree.command(name="job-owner",
                   description="Manage your job applicants",
-                  description_localizations={"th": "จัดการผู้สมัครงานของคุณ"})
+                  guild=GUILD2_OBJ)
 async def job_owner_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=JobOwnerView(ix.guild_id, ix.user.id), ephemeral=True)
 
 
@@ -568,9 +572,10 @@ class _SetRPChannelView(LayoutView):
 
 @bot.tree.command(name="job-admin",
                   description="Admin job management panel",
-                  description_localizations={"th": "แผงจัดการงานสำหรับแอดมิน"})
+                  guild=GUILD2_OBJ)
 @_is_admin()
 async def job_admin_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=JobAdminView(ix.guild_id), ephemeral=True)
 
 @job_admin_cmd.error

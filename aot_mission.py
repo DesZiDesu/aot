@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, save_config,
     load_players, save_players,
@@ -31,21 +31,20 @@ def _is_admin():
 mission_group = app_commands.Group(
     name="mission",
     description="Mission and quest commands",
-    description_localizations={"th": "คำสั่งภารกิจ"},
 )
 
 
 @mission_group.command(name="open",
-                       description="Browse available missions",
-                       description_localizations={"th": "ดูภารกิจที่เปิดรับ"})
+                       description="Browse available missions")
 async def mission_open(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=MissionListView(ix.guild_id, ix.user.id), ephemeral=True)
 
 
 @mission_group.command(name="admin",
-                       description="Admin mission management panel",
-                       description_localizations={"th": "แผงจัดการภารกิจสำหรับแอดมิน"})
+                       description="Admin mission management panel")
 async def mission_admin_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if not ix.guild:
         return
     m = ix.guild.get_member(ix.user.id)
@@ -57,9 +56,7 @@ async def mission_admin_cmd(ix: discord.Interaction):
     await ix.response.send_message(view=MissionAdminView(ix.guild_id, ix.guild), ephemeral=True)
 
 
-bot.tree.add_command(mission_group)
-
-
+bot.tree.add_command(mission_group, guild=GUILD2_OBJ)
 # ── Player: Mission List ──────────────────────────────────────────────────────
 
 class MissionListView(LayoutView):

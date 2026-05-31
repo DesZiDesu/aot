@@ -7,7 +7,7 @@ from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput, MediaGallery)
 from discord.components import MediaGalleryItem
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, load_players, save_players,
     load_shops, save_shops, format_currency, slugify,
@@ -28,6 +28,7 @@ def _is_admin():
 async def restock_task():
     now = time.time()
     for guild in bot.guilds:
+        if guild.id != GUILD2_ID: continue
         gid = guild.id
         db  = load_shops(gid); changed = False
         for shop in db.get("shops", {}).values():
@@ -314,10 +315,10 @@ class ShopSetupMainView(LayoutView):
         await ix.response.edit_message(view=self)
 
 
-@bot.tree.command(name="shop-setup", description="Create and manage shops",
-                  description_localizations={"th": "สร้างและจัดการร้านค้า"})
+@bot.tree.command(name="shop-setup", description="Create and manage shops", guild=GUILD2_OBJ)
 @_is_admin()
 async def shop_setup_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=ShopSetupMainView(ix.guild_id), ephemeral=True)
 
 @shop_setup_cmd.error
@@ -384,10 +385,10 @@ class ShopConfigView(LayoutView):
         await ix.response.edit_message(view=self)
 
 
-@bot.tree.command(name="shop-config", description="Configure shop items",
-                  description_localizations={"th": "ตั้งค่าสินค้าในร้านค้า"})
+@bot.tree.command(name="shop-config", description="Configure shop items", guild=GUILD2_OBJ)
 @_is_admin()
 async def shop_config_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=ShopConfigView(ix.guild_id), ephemeral=True)
 
 @shop_config_cmd.error
@@ -541,7 +542,7 @@ class ShopItemsView(LayoutView):
         self.parent._build(); await ix.response.edit_message(view=self.parent)
 
 
-@bot.tree.command(name="shop", description="Browse and buy from shops",
-                  description_localizations={"th": "เข้าดูสินค้าในร้านค้า"})
+@bot.tree.command(name="shop", description="Browse and buy from shops", guild=GUILD2_OBJ)
 async def shop_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=ShopListView(ix.guild_id), ephemeral=True)

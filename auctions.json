@@ -1,0 +1,24 @@
+{
+  "a492032f": {
+    "seller_id": "1083622448982925393",
+    "item_id": "iron_ore",
+    "qty": 1,
+    "start_price": 10,
+    "current_bid": 10,
+    "current_bidder_id": null,
+    "channel_id": 1498627056445952042,
+    "status": "closed",
+    "created_at": 1779945105
+  },
+  "0fde68ee": {
+    "seller_id": "688416102140739653",
+    "item_id": "ไข่",
+    "qty": 1,
+    "start_price": 50,
+    "current_bid": 50,
+    "current_bidder_id": null,
+    "channel_id": 1509451433181974610,
+    "status": "closed",
+    "created_at": 1780065861
+  }
+}

@@ -4,7 +4,7 @@ import discord
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, load_announcements, save_announcements,
 )
@@ -228,8 +228,9 @@ class AnnouncementListView(LayoutView):
 
 @bot.tree.command(name="paradis-announcement",
                   description="Create and publish announcements",
-                  description_localizations={"th": "สร้างและเผยแพร่ประกาศ"})
+                  guild=GUILD2_OBJ)
 async def announcement_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if not _can_announce(ix):
         v = LayoutView(timeout=60)
         v.add_item(Container(TextDisplay(t(ix.guild_id, "ann_no_permission"))))

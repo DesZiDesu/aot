@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, load_players, save_players,
     has_shifter_access, cv2_dm, log_event, is_url,
@@ -25,8 +25,9 @@ def _is_admin_or_manage(member) -> bool:
 
 @bot.tree.command(name="mindless",
                   description="Open mindless titan panel",
-                  description_localizations={"th": "เปิดแผงไทแทนที่ไร้สติ"})
+                  guild=GUILD2_OBJ)
 async def mindless_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if not _is_mindless(ix.guild_id, ix.user.id):
         v = LayoutView(timeout=60)
         v.add_item(Container(TextDisplay(t(ix.guild_id, "mindless_no_perm"))))
@@ -272,9 +273,10 @@ class EatRefuseModal(Modal, title="Refuse"):
 
 @bot.tree.command(name="mindless-inject",
                   description="Inject a player to make them a Mindless Titan",
-                  description_localizations={"th": "ฉีดยาผู้เล่นให้กลายเป็นไทแทนที่ไร้สติ"})
+                  guild=GUILD2_OBJ)
 @app_commands.describe(target="Target player")
 async def mindless_inject_cmd(ix: discord.Interaction, target: discord.Member):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if not ix.guild:
         return
     m = ix.guild.get_member(ix.user.id)

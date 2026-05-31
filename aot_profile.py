@@ -4,7 +4,7 @@ import discord
 from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput, Section, Thumbnail, MediaGallery
 from discord.components import MediaGalleryItem
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_players, save_players, load_config, load_items,
     select_options_from_list, get_available_bloodlines,
@@ -473,8 +473,9 @@ class UnregisteredView(LayoutView):
 
 # ── /profile command ──────────────────────────────────────────────────────────
 
-@bot.tree.command(name="profile", description="View or create your character profile")
+@bot.tree.command(name="profile", description="View or create your character profile", guild=GUILD2_OBJ)
 async def profile_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     gid = ix.guild_id; uid = ix.user.id
     player = load_players(gid).get(str(uid))
     if not player:

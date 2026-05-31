@@ -1,12 +1,13 @@
 """Economy system — /balance command."""
 import discord
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import t, load_players, load_config, format_currency
 from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow
 
 
-@bot.tree.command(name="balance", description="Check your coin balance")
+@bot.tree.command(name="balance", description="Check your coin balance", guild=GUILD2_OBJ)
 async def balance_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     gid = ix.guild_id; uid = ix.user.id
     cfg    = load_config(gid)
     player = load_players(gid).get(str(uid), {})

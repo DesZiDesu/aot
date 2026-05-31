@@ -7,7 +7,7 @@ from discord.ui import (LayoutView, Container, TextDisplay, Separator, ActionRow
                         Button, Select, Modal, TextInput, MediaGallery)
 from discord.components import MediaGalleryItem
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_players, save_players, load_config, save_config,
     select_options_from_list, has_shifter_access, cv2_dm, is_url,
@@ -220,12 +220,11 @@ class ShifterAdminView(LayoutView):
 shifter_group = app_commands.Group(
     name="shifter",
     description="Titan shifter commands",
-    description_localizations={"th": "คำสั่งผู้ถือพลังไทแทน"},
 )
 
-@shifter_group.command(name="open", description="Open your titan shifter panel",
-                       description_localizations={"th": "เปิดแผงผู้ถือพลังไทแทน"})
+@shifter_group.command(name="open", description="Open your titan shifter panel")
 async def shifter_open(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     gid = ix.guild_id; uid = ix.user.id
     if not has_shifter_access(gid, uid):
         v = LayoutView(timeout=60)
@@ -241,9 +240,9 @@ async def shifter_open(ix: discord.Interaction):
         return
     await ix.response.send_message(view=ShifterMainView(uid, gid), ephemeral=True)
 
-@shifter_group.command(name="admin", description="Shifter admin panel",
-                       description_localizations={"th": "แผงผู้ดูแลระบบผู้ถือพลัง"})
+@shifter_group.command(name="admin", description="Shifter admin panel")
 async def shifter_admin(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if not ix.guild: return
     m = ix.guild.get_member(ix.user.id)
     if not m or not (m.guild_permissions.administrator or m.guild_permissions.manage_guild):
@@ -253,9 +252,7 @@ async def shifter_admin(ix: discord.Interaction):
         return
     await ix.response.send_message(view=ShifterAdminView(ix.guild_id, ix.guild), ephemeral=True)
 
-bot.tree.add_command(shifter_group)
-
-
+bot.tree.add_command(shifter_group, guild=GUILD2_OBJ)
 # ── ShifterMainView ───────────────────────────────────────────────────────────
 
 class ShifterMainView(LayoutView):
@@ -1061,6 +1058,7 @@ class _AbilityCostModal(Modal, title="Set Stamina Cost"):
 async def check_titan_expiry():
     import random
     for guild in bot.guilds:
+        if guild.id != GUILD2_ID: continue
         gid = guild.id; cfg = load_config(gid); players = load_players(gid)
         now = time.time(); changed = False
         for uid, player in list(players.items()):
@@ -1117,6 +1115,7 @@ async def check_titan_expiry():
 @tasks.loop(minutes=1)
 async def regen_stamina_task():
     for guild in bot.guilds:
+        if guild.id != GUILD2_ID: continue
         gid = guild.id; cfg = load_config(gid)
         players = load_players(gid); changed = False
         for uid, player in players.items():

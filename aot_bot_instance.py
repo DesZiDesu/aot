@@ -1,9 +1,15 @@
-"""Single bot instance imported by all modules."""
-import discord
-from discord.ext import commands
+"""AoT integration — uses orion_bot's bot instance + locked to GUILD2 only."""
+import sys
 
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True  # Required for job RP mode; enable MESSAGE CONTENT in Discord Dev Portal
+_orion_bot_mod = sys.modules.get("orion_bot") or sys.modules.get("__main__")
+if _orion_bot_mod is None or not hasattr(_orion_bot_mod, "bot"):
+    raise ImportError("aot modules must be imported from orion_bot.py")
 
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+bot         = _orion_bot_mod.bot
+GUILD2_ID   = _orion_bot_mod.GUILD2_ID
+GUILD2_OBJ  = _orion_bot_mod._GUILD2_OBJ
+
+
+def guild2_only(interaction) -> bool:
+    """check: command อนุญาตเฉพาะ GUILD2"""
+    return bool(interaction.guild and interaction.guild.id == GUILD2_ID)

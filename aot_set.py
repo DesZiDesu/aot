@@ -3,8 +3,7 @@ import discord
 from discord import app_commands
 from discord.ui import LayoutView, Container, TextDisplay, Separator
 
-from aot_bot_instance import bot
-
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 ALLOWED_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
 
@@ -28,6 +27,7 @@ set_group = app_commands.Group(name="set", description="Change the bot's appeara
 @set_group.command(name="profile", description="Change the bot's profile picture")
 @_is_admin()
 async def set_profile_cmd(ix: discord.Interaction, image: discord.Attachment):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if image.content_type not in ALLOWED_TYPES:
         await ix.response.send_message(view=_reply("❌ Please upload a PNG, JPG, GIF, or WebP image."), ephemeral=True)
         return
@@ -43,6 +43,7 @@ async def set_profile_cmd(ix: discord.Interaction, image: discord.Attachment):
 @set_group.command(name="banner", description="Change the bot's banner")
 @_is_admin()
 async def set_banner_cmd(ix: discord.Interaction, image: discord.Attachment):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if image.content_type not in ALLOWED_TYPES:
         await ix.response.send_message(view=_reply("❌ Please upload a PNG, JPG, GIF, or WebP image."), ephemeral=True)
         return
@@ -57,8 +58,9 @@ async def set_banner_cmd(ix: discord.Interaction, image: discord.Attachment):
 
 @set_group.error
 async def set_error(ix: discord.Interaction, error):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     if not ix.response.is_done():
         await ix.response.send_message(view=_reply("❌ Administrator only."), ephemeral=True)
 
 
-bot.tree.add_command(set_group)
+bot.tree.add_command(set_group, guild=GUILD2_OBJ)

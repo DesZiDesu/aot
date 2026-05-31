@@ -2,7 +2,7 @@
 import discord
 from discord.ui import (LayoutView, Container, TextDisplay, Separator, ActionRow, Button)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import t, load_players, _xp_for_level, _get_level
 
 
@@ -61,6 +61,7 @@ class XPView(LayoutView):
 
 @bot.tree.command(name="xp",
                   description="View your XP and level",
-                  description_localizations={"th": "ดู XP และระดับของคุณ"})
+                  guild=GUILD2_OBJ)
 async def xp_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=XPView(ix.user.id, ix.guild_id), ephemeral=True)

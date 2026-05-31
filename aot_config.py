@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, save_config, load_players, save_players,
     select_options_from_list, format_currency,
@@ -893,10 +893,10 @@ class _AnnRoleView(LayoutView):
 
 # ── /config command ───────────────────────────────────────────────────────────
 
-@bot.tree.command(name="config", description="Configure bot settings",
-                  description_localizations={"th": "ตั้งค่าบอท"})
+@bot.tree.command(name="config", description="Configure bot settings", guild=GUILD2_OBJ)
 @_is_admin()
 async def config_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(
         view=ConfigMainView(ix.guild_id, ix.guild), ephemeral=True)
 

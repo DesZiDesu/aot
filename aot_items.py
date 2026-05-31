@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput, MediaGallery
 from discord.components import MediaGalleryItem
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_players, save_players, load_items, save_items,
     select_options_from_list, slugify, is_url, cv2_dm,
@@ -852,17 +852,18 @@ class PlayerItemsView(LayoutView):
         await ix.response.edit_message(view=self)
 
 
-@bot.tree.command(name="items", description="Browse all server items",
-                  description_localizations={"th": "ดูรายการไอเทมทั้งหมด"})
+@bot.tree.command(name="items", description="Browse all server items", guild=GUILD2_OBJ)
 async def items_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=PlayerItemsView(ix.guild_id), ephemeral=True)
 
 
 # ── /item-admin ───────────────────────────────────────────────────────────────
 
-@bot.tree.command(name="item-admin", description="Item admin panel")
+@bot.tree.command(name="item-admin", description="Item admin panel", guild=GUILD2_OBJ)
 @is_admin()
 async def item_admin_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=ItemAdminMainView(ix.guild_id), ephemeral=True)
 
 @item_admin_cmd.error

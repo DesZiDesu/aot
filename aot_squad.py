@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, load_players, save_players,
     load_squads, save_squads, get_player_squad, cv2_dm, log_event,
@@ -439,6 +439,7 @@ class PunishMemberModal(Modal, title="Punish Member"):
 
 @bot.tree.command(name="squad",
                   description="Manage your squad",
-                  description_localizations={"th": "จัดการหน่วยรบของคุณ"})
+                  guild=GUILD2_OBJ)
 async def squad_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=SquadView(ix.guild_id, ix.user.id), ephemeral=True)

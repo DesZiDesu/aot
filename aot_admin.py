@@ -3,7 +3,7 @@ import discord
 from discord import app_commands
 from discord.ui import LayoutView, Container, TextDisplay, Separator, ActionRow, Button, Select, Modal, TextInput
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import (
     t, load_config, save_config, load_players, save_players,
     select_options_from_list, cv2_dm,

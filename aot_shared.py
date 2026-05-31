@@ -777,60 +777,60 @@ def _save_json(path: Path, data):
 
 
 def load_players(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"players_{guild_id}.json", dict)
+    return _load_json(DATA_DIR / f"aot_players_{guild_id}.json", dict)
 
 def save_players(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"players_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_players_{guild_id}.json", data)
 
 def load_config(guild_id: int) -> dict:
-    raw = _load_json(DATA_DIR / f"config_{guild_id}.json", dict)
+    raw = _load_json(DATA_DIR / f"aot_config_{guild_id}.json", dict)
     merged = {**DEFAULT_CONFIG, **raw}
     for rtype in ("faction", "rank", "shifter", "bloodline"):
         merged["roles"].setdefault(rtype, {})
     return merged
 
 def save_config(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"config_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_config_{guild_id}.json", data)
 
 def load_items(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"items_{guild_id}.json",
+    return _load_json(DATA_DIR / f"aot_items_{guild_id}.json",
                       lambda: {"categories": {}, "category_order": [], "items": {}})
 
 def save_items(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"items_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_items_{guild_id}.json", data)
 
 def load_announcements(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"announcements_{guild_id}.json", lambda: {"drafts": {}})
+    return _load_json(DATA_DIR / f"aot_announcements_{guild_id}.json", lambda: {"drafts": {}})
 
 def save_announcements(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"announcements_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_announcements_{guild_id}.json", data)
 
 def load_shops(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"shops_{guild_id}.json", lambda: {"shops": {}})
+    return _load_json(DATA_DIR / f"aot_shops_{guild_id}.json", lambda: {"shops": {}})
 
 def save_shops(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"shops_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_shops_{guild_id}.json", data)
 
 def load_missions(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"missions_{guild_id}.json", lambda: {"missions": {}})
+    return _load_json(DATA_DIR / f"aot_missions_{guild_id}.json", lambda: {"missions": {}})
 
 def save_missions(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"missions_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_missions_{guild_id}.json", data)
 
 def load_jobs(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"jobs_{guild_id}.json", lambda: {"jobs": {}})
+    return _load_json(DATA_DIR / f"aot_jobs_{guild_id}.json", lambda: {"jobs": {}})
 
 def save_jobs(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"jobs_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_jobs_{guild_id}.json", data)
 
 def load_squads(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"squads_{guild_id}.json", lambda: {"squads": {}})
+    return _load_json(DATA_DIR / f"aot_squads_{guild_id}.json", lambda: {"squads": {}})
 
 def save_squads(guild_id: int, data: dict):
-    _save_json(DATA_DIR / f"squads_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_squads_{guild_id}.json", data)
 
 def load_logs_data(guild_id: int) -> dict:
-    return _load_json(DATA_DIR / f"logs_{guild_id}.json", lambda: {"entries": []})
+    return _load_json(DATA_DIR / f"aot_logs_{guild_id}.json", lambda: {"entries": []})
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
@@ -839,7 +839,7 @@ def save_logs_data(guild_id: int, data: dict):
     entries = data.get("entries", [])
     if len(entries) > 500:
         data["entries"] = entries[-500:]
-    _save_json(DATA_DIR / f"logs_{guild_id}.json", data)
+    _save_json(DATA_DIR / f"aot_logs_{guild_id}.json", data)
 
 
 async def log_event(bot_instance, guild_id: int, category: str, text: str) -> None:

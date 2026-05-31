@@ -1,0 +1,50 @@
+{
+  "484666": {
+    "owner_id": "1083622448982925393",
+    "game": "roulette",
+    "channel_id": 1509875353760301146,
+    "status": "closed",
+    "players": [
+      {
+        "uid": "236114759810809866",
+        "bet": 1,
+        "choice": "red",
+        "choice_val": null
+      }
+    ],
+    "min_bet": 1,
+    "max_bet": 500,
+    "max_players": 3,
+    "created_at": 1780055910
+  },
+  "dab43a": {
+    "owner_id": "1083622448982925393",
+    "game": "roulette",
+    "channel_id": 1509875353760301146,
+    "status": "closed",
+    "players": [
+      {
+        "uid": "200608326327730176",
+        "bet": 5,
+        "choice": "red",
+        "choice_val": null
+      },
+      {
+        "uid": "236114759810809866",
+        "bet": 10,
+        "choice": "black",
+        "choice_val": null
+      },
+      {
+        "uid": "1083622448982925393",
+        "bet": 100,
+        "choice": "red",
+        "choice_val": null
+      }
+    ],
+    "min_bet": 1,
+    "max_bet": 100,
+    "max_players": 2,
+    "created_at": 1780056130
+  }
+}

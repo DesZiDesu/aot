@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ui import (LayoutView, Container, TextDisplay, Separator,
                         ActionRow, Button, Select, Modal, TextInput)
 
-from aot_bot_instance import bot
+from aot_bot_instance import bot, GUILD2_ID, GUILD2_OBJ
 from aot_shared import t, load_config, save_config, load_logs_data
 
 
@@ -234,9 +234,10 @@ class LogsViewView(LayoutView):
 
 @bot.tree.command(name="logs-setup",
                   description="Configure the audit logging system",
-                  description_localizations={"th": "ตั้งค่าระบบบันทึกการกระทำ"})
+                  guild=GUILD2_OBJ)
 @_is_admin()
 async def logs_setup_cmd(ix: discord.Interaction):
+    if not ix.guild or ix.guild.id != GUILD2_ID: return
     await ix.response.send_message(view=LogsSetupView(ix.guild_id, ix.guild), ephemeral=True)
 
 @logs_setup_cmd.error
