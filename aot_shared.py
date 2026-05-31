@@ -54,6 +54,17 @@ DEFAULT_CONFIG = {
     "currency_name": "Coins",
     "currency_emoji": "",
     "currency_image": "",
+    "logs_channel": None,
+    "logs_categories": {},
+    "mission_channels": [],
+    "mission_log_channels": [],
+    "inheritance_races": ["Eldian", "Mixed Blood Eldian"],
+    "error_log_channel": None,
+    "squad_max_members": 6,
+    "squad_creator_ranks": ["Commander", "General"],
+    "mindless_syringe_item": "",
+    "mindless_fluid_item": "",
+    "xp_enabled": True,
 }
 
 # ── i18n ─────────────────────────────────────────────────────────────────────
@@ -229,6 +240,168 @@ LANG = {
         "manage_faction_roles_btn": "จัดการสังกัดและยศ",
         "grant_rank_btn": "ให้ยศพิเศษ",
         "got_rank_dm": "✨ คุณได้รับสิทธิ์ยศ **{rank}** ใน **{faction}** แล้ว! ใช้ `/profile` เพื่ออัปเดต",
+        "mission_title": "📋 ภารกิจ",
+        "create_mission_btn": "สร้างภารกิจใหม่",
+        "no_missions": "ยังไม่มีภารกิจ",
+        "join_mission_btn": "⚔️ เข้าร่วม",
+        "view_players_btn": "👥 ดูรายชื่อ",
+        "mission_joined": "✅ เข้าร่วมภารกิจ **{name}** แล้ว!",
+        "mission_full": "❌ ภารกิจนี้เต็มแล้ว ({max} คน)",
+        "already_joined_mission": "❌ คุณเข้าร่วมภารกิจนี้แล้ว",
+        "finish_mission_btn": "✅ จบภารกิจ",
+        "mission_log_field": "บันทึกเหตุการณ์ในภารกิจ",
+        "mission_completed": "✅ ภารกิจ **{name}** เสร็จสมบูรณ์!",
+        "configure_drops_btn": "🎁 ตั้งค่ารางวัล",
+        "drop_for_all_btn": "รางวัลสำหรับทุกคน",
+        "drop_for_player_btn": "รางวัลเฉพาะบุคคล",
+        "mission_name_field": "ชื่อภารกิจ",
+        "mission_desc_field": "คำอธิบาย",
+        "mission_max_field": "จำนวนผู้เล่นสูงสุด (0=ไม่จำกัด)",
+        "mission_admin_title": "⚔️ แผงแอดมินภารกิจ",
+        "mission_players_title": "👥 ผู้เข้าร่วมภารกิจ",
+        "mission_notify_admin": "🔔 **{user}** เข้าร่วมภารกิจ **{mission}**!",
+        "page_label": "หน้า {page}/{total}",
+        "edit_mission_btn": "แก้ไข",
+        "delete_mission_btn": "🗑️ ลบ",
+        "mission_channels_btn": "ตั้งช่องโพสต์",
+        "mission_log_channels_btn": "ตั้งช่องบันทึก",
+        "not_registered_join": "❌ ต้องลงทะเบียนตัวละครก่อน",
+        "mission_drop_item_field": "ชื่อไอเทม",
+        "mission_drop_qty_field": "จำนวน",
+        "mission_drop_added": "✅ เพิ่มรางวัลแล้ว",
+        "mission_drop_given": "🎁 คุณได้รับ **{item}** × {qty} จากภารกิจ!",
+        "job_title": "💼 งาน",
+        "no_jobs": "ยังไม่มีงาน",
+        "apply_job_btn": "📝 สมัครงาน",
+        "job_applied": "✅ สมัครงาน **{name}** แล้ว! รอการอนุมัติ",
+        "job_accepted": "✅ ได้รับการรับเข้าทำงาน **{name}** แล้ว!",
+        "job_declined": "❌ การสมัครงาน **{name}** ถูกปฏิเสธ",
+        "job_owner_title": "👔 แผงจัดการงาน",
+        "job_admin_title": "⚙️ แผงแอดมินงาน",
+        "create_job_btn": "สร้างงานใหม่",
+        "job_name_field": "ชื่องาน",
+        "job_desc_field": "คำอธิบาย",
+        "job_owner_field": "ชื่อนายจ้าง",
+        "job_salary_field": "รายได้",
+        "job_mode_rp": "📝 โหมด RP (พิมพ์ในห้อง)",
+        "job_mode_passive": "💤 รายได้อัตโนมัติ",
+        "job_min_letters_field": "ตัวอักษรขั้นต่ำต่อรอบ",
+        "job_cooldown_field": "คูลดาวน์ (วินาที)",
+        "job_rp_reward_field": "รางวัลต่อรอบ",
+        "job_passive_interval_field": "รับเงินทุกกี่วินาที",
+        "job_passive_reward_field": "จำนวนเงินที่ได้",
+        "job_notify_owner": "🔔 **{user}** ({char}) สมัครงาน **{job}**!\nใช้ `/job-owner` เพื่อจัดการ",
+        "job_created": "✅ สร้างงาน **{name}** แล้ว",
+        "job_rp_earned": "💰 ได้รับ **{amount}** จากงาน **{job}**!",
+        "job_passive_earned": "💰 รายได้จากงาน **{job}**: +**{amount}**!",
+        "job_all_active": "งานทั้งหมด",
+        "select_applicant": "เลือกผู้สมัคร",
+        "no_applicants": "ยังไม่มีผู้สมัคร",
+        "job_fired": "คุณถูกออกจากงาน **{job}**",
+        "fire_employee_btn": "ไล่ออก",
+        "xp_title": "⭐ ระดับและประสบการณ์",
+        "xp_label": "XP",
+        "level_label": "ระดับ",
+        "level_up_msg": "🎉 ยินดีด้วย {name}! คุณขึ้นระดับเป็น **{level}** แล้ว!",
+        "xp_progress_label": "ความคืบหน้า",
+        "next_level_label": "ระดับถัดไปที่",
+        "xp_gained": "✨ +{amount} XP จาก {reason}",
+        "squad_title": "⚔️ หน่วยรบ",
+        "create_squad_btn": "สร้างหน่วยรบ",
+        "squad_name_field": "ชื่อหน่วยรบ",
+        "squad_invite_btn": "📩 เชิญสมาชิก",
+        "squad_kick_btn": "👢 ไล่ออก",
+        "squad_promote_btn": "⬆️ เลื่อนตำแหน่ง",
+        "squad_disband_btn": "💥 ยุบหน่วย",
+        "squad_leave_btn": "🚪 ออกจากหน่วย",
+        "squad_punish_btn": "⚠️ ลงโทษ",
+        "squad_joined_msg": "✅ **{user}** เข้าร่วมหน่วย **{squad}** แล้ว!",
+        "squad_kicked_msg": "👢 **{user}** ถูกไล่ออกจากหน่วย **{squad}**!",
+        "squad_disbanded_msg": "💥 หน่วย **{squad}** ถูกยุบแล้ว!",
+        "squad_invite_sent": "✅ ส่งคำเชิญไปยัง {user} แล้ว",
+        "squad_invite_dm": "📩 คุณได้รับคำเชิญเข้าหน่วยรบ **{squad}**!\nใช้ `/squad` เพื่อตอบรับ",
+        "squad_full_msg": "❌ หน่วยรบเต็มแล้ว ({max} คน)",
+        "squad_wrong_faction": "❌ ต้องอยู่สังกัดเดียวกับผู้นำ ({faction})",
+        "squad_no_perm": "❌ ต้องมียศ {ranks} ขึ้นไปจึงจะสร้างหน่วยรบได้",
+        "squad_pending_invites_btn": "📩 คำเชิญที่รอดำเนินการ",
+        "squad_accept_btn": "✅ ยอมรับ",
+        "squad_decline_btn": "❌ ปฏิเสธ",
+        "no_squad": "คุณไม่ได้อยู่ในหน่วยรบ",
+        "squad_no_invite": "ไม่มีคำเชิญที่รอดำเนินการ",
+        "squad_members_label": "สมาชิก",
+        "squad_title_label": "ตำแหน่ง",
+        "squad_faction_label": "สังกัด",
+        "squad_promote_title_field": "ตำแหน่งใหม่",
+        "squad_punish_msg": "⚠️ **{user}** ได้รับการลงโทษในหน่วย **{squad}**: {reason}",
+        "squad_punish_reason_field": "เหตุผล",
+        "squad_already_member": "❌ คุณอยู่ในหน่วยรบแล้ว",
+        "squad_leave_confirm": "คุณออกจากหน่วย **{squad}** แล้ว",
+        "squad_already_invited": "❌ ผู้เล่นคนนี้ได้รับคำเชิญแล้ว",
+        "mindless_title": "🧟 ไทแทนที่ไร้สติ",
+        "mindless_grab_btn": "✊ คว้า/จับ",
+        "mindless_eat_btn": "🦷 กิน",
+        "mindless_transform_msg": "⚡ **{name}** กลายเป็นไทแทนที่ไร้สติ!",
+        "mindless_grab_msg": "✊ **{name}** คว้า **{target}**!",
+        "mindless_eat_ask_body": "**{eater}** กำลังจะกินคุณ! คุณยอมรับหรือไม่?",
+        "mindless_eat_accept_btn": "✅ ยอมรับ",
+        "mindless_eat_decline_btn": "❌ ปฏิเสธ",
+        "mindless_ate_shifter_msg": "💀 **{eater}** กิน **{target}** และได้รับพลัง **{titan}**!",
+        "mindless_ate_normal_msg": "💀 **{eater}** กิน **{target}**!",
+        "mindless_power_guide": "⚡ คุณได้รับพลัง **{titan}** จากการกิน!\n\nใช้ `/shifter` เพื่อเริ่มใช้พลัง",
+        "mindless_no_perm": "❌ คุณไม่ได้อยู่ในสถานะไทแทนที่ไร้สติ",
+        "mindless_inject_confirm_text": "ยืนยันฉีดยา **{target}** ให้กลายเป็นไทแทนที่ไร้สติ?",
+        "mindless_inject_msg": "💉 **{user}** ถูกฉีดยาจาก **{injector}** และกลายเป็นไทแทนที่ไร้สติ!",
+        "mindless_no_syringe": "❌ คุณไม่มีหลอดฉีดยา ({item})",
+        "mindless_no_fluid": "❌ คุณไม่มีของเหลว ({item})",
+        "eat_reason_field": "เหตุผลในการปฏิเสธ",
+        "mindless_eat_refused": "❌ **{target}** ปฏิเสธ: {reason}",
+        "select_target": "เลือกเป้าหมาย",
+        "grab_btn": "✊ คว้า/จับ",
+        "eat_btn": "🦷 กิน",
+        "shifter_grab_msg": "✊ **{name}** คว้า **{target}**!",
+        "shifter_eat_ask_body": "**{eater}** กำลังจะกินคุณ! คุณยอมรับหรือไม่?",
+        "shifter_ate_shifter_msg": "💀 **{eater}** กิน **{target}** และได้รับพลัง **{titan}**!",
+        "shifter_ate_normal_msg": "💀 **{eater}** กิน **{target}**!",
+        "upgrade_ability_btn": "⬆️ อัปเกรดทักษะ",
+        "upgrade_title": "⬆️ อัปเกรดทักษะ",
+        "upgrade_cd_btn": "⏱ ลดคูลดาวน์ (-5m)",
+        "upgrade_cost_btn": "💪 ลดค่าพลังงาน (-5)",
+        "upgrade_not_enough": "❌ เงินไม่พอ ต้องการ {cost}",
+        "upgrade_done": "✅ อัปเกรดสำเร็จ!",
+        "customize_form_btn": "🎨 ปรับแต่งรูปร่าง",
+        "customize_form_title": "🎨 ปรับแต่งรูปร่างไทแทน",
+        "form_display_name_field": "ชื่อที่แสดง (ว่าง = ใช้ชื่อเดิม)",
+        "form_image_field": "URL รูปภาพ (ไม่บังคับ)",
+        "form_desc_field": "คำอธิบายรูปร่าง (ไม่บังคับ)",
+        "form_saved": "✅ บันทึกการปรับแต่งรูปร่างแล้ว",
+        "backstory_tab": "📖 ประวัติ",
+        "journal_tab": "📔 บันทึก",
+        "backstory_empty": "ยังไม่มีประวัติตัวละคร",
+        "journal_empty": "ยังไม่มีบันทึก",
+        "add_journal_btn": "➕ เพิ่มบันทึก",
+        "edit_backstory_btn": "✏️ แก้ไขประวัติ",
+        "journal_entry_field": "เนื้อหาบันทึก",
+        "journal_public_btn": "🌐 สาธารณะ",
+        "journal_private_btn": "🔒 ส่วนตัว",
+        "journal_delete_btn": "🗑️ ลบ",
+        "backstory_field": "ประวัติตัวละคร",
+        "logs_setup_title": "📊 ตั้งค่าระบบบันทึก",
+        "logs_channel_label": "ช่องทางบันทึก",
+        "create_logs_channel_btn": "🔧 สร้างช่องทางบันทึก",
+        "set_logs_channel_btn": "📌 กำหนดช่องทาง",
+        "logs_channel_set_msg": "✅ ตั้งค่าช่องทางบันทึกแล้ว",
+        "logs_channel_created_msg": "✅ สร้างช่องทางบันทึก #{name} แล้ว",
+        "logs_no_channel": "❌ ยังไม่ได้ตั้งค่าช่องทางบันทึก",
+        "logs_categories_btn": "📂 หมวดหมู่",
+        "view_logs_btn": "👁️ ดูบันทึก",
+        "no_logs_entries": "ยังไม่มีบันทึก",
+        "backup_title": "💾 สำรองข้อมูล",
+        "backup_create_btn": "📦 สร้างไฟล์สำรอง",
+        "backup_restore_btn": "🔄 กู้คืนข้อมูล",
+        "backup_created_msg": "✅ สร้างไฟล์สำรองสำเร็จ",
+        "backup_restored_msg": "✅ กู้คืนข้อมูลสำเร็จ",
+        "backup_upload_prompt": "อัปโหลดไฟล์สำรอง (.zip) ในข้อความถัดไปภายใน 60 วินาที",
+        "backup_invalid_file": "❌ ไม่พบไฟล์หรือรูปแบบไม่ถูกต้อง",
     },
     "en": {
         "profile_title": "Character Profile",
@@ -400,6 +573,168 @@ LANG = {
         "manage_faction_roles_btn": "Manage Faction Roles",
         "grant_rank_btn": "Grant Hidden Rank",
         "got_rank_dm": "✨ You've been granted **{rank}** rank in **{faction}**! Use `/profile` to update.",
+        "mission_title": "📋 Missions",
+        "create_mission_btn": "Create Mission",
+        "no_missions": "No missions available.",
+        "join_mission_btn": "⚔️ Join",
+        "view_players_btn": "👥 View Players",
+        "mission_joined": "✅ Joined mission **{name}**!",
+        "mission_full": "❌ Mission is full ({max} players).",
+        "already_joined_mission": "❌ You already joined this mission.",
+        "finish_mission_btn": "✅ Finish Mission",
+        "mission_log_field": "Mission Log (what happened)",
+        "mission_completed": "✅ Mission **{name}** completed!",
+        "configure_drops_btn": "🎁 Configure Drops",
+        "drop_for_all_btn": "Drop for All",
+        "drop_for_player_btn": "Drop for Specific Player",
+        "mission_name_field": "Mission Name",
+        "mission_desc_field": "Description",
+        "mission_max_field": "Max Players (0 = unlimited)",
+        "mission_admin_title": "⚔️ Mission Admin Panel",
+        "mission_players_title": "👥 Mission Players",
+        "mission_notify_admin": "🔔 **{user}** joined mission **{mission}**!",
+        "page_label": "Page {page}/{total}",
+        "edit_mission_btn": "Edit",
+        "delete_mission_btn": "🗑️ Delete",
+        "mission_channels_btn": "Set Post Channels",
+        "mission_log_channels_btn": "Set Log Channels",
+        "not_registered_join": "❌ You must register a character first.",
+        "mission_drop_item_field": "Item Name",
+        "mission_drop_qty_field": "Quantity",
+        "mission_drop_added": "✅ Drop added.",
+        "mission_drop_given": "🎁 You received **{item}** × {qty} from the mission!",
+        "job_title": "💼 Jobs",
+        "no_jobs": "No jobs available.",
+        "apply_job_btn": "📝 Apply",
+        "job_applied": "✅ Applied for **{name}**! Awaiting approval.",
+        "job_accepted": "✅ You were accepted for **{name}**!",
+        "job_declined": "❌ Your application for **{name}** was declined.",
+        "job_owner_title": "👔 Job Owner Panel",
+        "job_admin_title": "⚙️ Job Admin Panel",
+        "create_job_btn": "Create Job",
+        "job_name_field": "Job Name",
+        "job_desc_field": "Description",
+        "job_owner_field": "Owner Name",
+        "job_salary_field": "Salary",
+        "job_mode_rp": "📝 RP Mode (earn by typing)",
+        "job_mode_passive": "💤 Passive Income",
+        "job_min_letters_field": "Min letters per round",
+        "job_cooldown_field": "Cooldown (seconds)",
+        "job_rp_reward_field": "Reward per round",
+        "job_passive_interval_field": "Earn every N seconds",
+        "job_passive_reward_field": "Amount earned",
+        "job_notify_owner": "🔔 **{user}** ({char}) applied for **{job}**!\nUse `/job-owner` to manage.",
+        "job_created": "✅ Job **{name}** created.",
+        "job_rp_earned": "💰 Earned **{amount}** from job **{job}**!",
+        "job_passive_earned": "💰 Passive income from **{job}**: +**{amount}**!",
+        "job_all_active": "All Active Jobs",
+        "select_applicant": "Select Applicant",
+        "no_applicants": "No applicants yet.",
+        "job_fired": "You were let go from job **{job}**.",
+        "fire_employee_btn": "Fire Employee",
+        "xp_title": "⭐ Level & Experience",
+        "xp_label": "XP",
+        "level_label": "Level",
+        "level_up_msg": "🎉 Congratulations {name}! You reached **Level {level}**!",
+        "xp_progress_label": "Progress",
+        "next_level_label": "Next level at",
+        "xp_gained": "✨ +{amount} XP from {reason}",
+        "squad_title": "⚔️ Squad",
+        "create_squad_btn": "Create Squad",
+        "squad_name_field": "Squad Name",
+        "squad_invite_btn": "📩 Invite Member",
+        "squad_kick_btn": "👢 Kick",
+        "squad_promote_btn": "⬆️ Promote",
+        "squad_disband_btn": "💥 Disband",
+        "squad_leave_btn": "🚪 Leave Squad",
+        "squad_punish_btn": "⚠️ Punish",
+        "squad_joined_msg": "✅ **{user}** joined squad **{squad}**!",
+        "squad_kicked_msg": "👢 **{user}** was kicked from squad **{squad}**!",
+        "squad_disbanded_msg": "💥 Squad **{squad}** has been disbanded!",
+        "squad_invite_sent": "✅ Invite sent to {user}.",
+        "squad_invite_dm": "📩 You've been invited to join squad **{squad}**!\nUse `/squad` to respond.",
+        "squad_full_msg": "❌ Squad is full ({max} members).",
+        "squad_wrong_faction": "❌ You must be in the same faction as the leader ({faction}).",
+        "squad_no_perm": "❌ You need rank {ranks} to create a squad.",
+        "squad_pending_invites_btn": "📩 Pending Invites",
+        "squad_accept_btn": "✅ Accept",
+        "squad_decline_btn": "❌ Decline",
+        "no_squad": "You are not in a squad.",
+        "squad_no_invite": "No pending invites.",
+        "squad_members_label": "Members",
+        "squad_title_label": "Title",
+        "squad_faction_label": "Faction",
+        "squad_promote_title_field": "New Title",
+        "squad_punish_msg": "⚠️ **{user}** was punished in squad **{squad}**: {reason}",
+        "squad_punish_reason_field": "Reason",
+        "squad_already_member": "❌ You are already in a squad.",
+        "squad_leave_confirm": "You left squad **{squad}**.",
+        "squad_already_invited": "❌ This player was already invited.",
+        "mindless_title": "🧟 Mindless Titan",
+        "mindless_grab_btn": "✊ Grab",
+        "mindless_eat_btn": "🦷 Eat",
+        "mindless_transform_msg": "⚡ **{name}** has become a Mindless Titan!",
+        "mindless_grab_msg": "✊ **{name}** grabs **{target}**!",
+        "mindless_eat_ask_body": "**{eater}** is trying to eat you! Do you accept?",
+        "mindless_eat_accept_btn": "✅ Accept",
+        "mindless_eat_decline_btn": "❌ Refuse",
+        "mindless_ate_shifter_msg": "💀 **{eater}** ate **{target}** and gained the **{titan}** power!",
+        "mindless_ate_normal_msg": "💀 **{eater}** ate **{target}**!",
+        "mindless_power_guide": "⚡ You received the **{titan}** power!\n\nUse `/shifter` to start using your power.",
+        "mindless_no_perm": "❌ You are not a Mindless Titan.",
+        "mindless_inject_confirm_text": "Confirm injecting **{target}** to become a Mindless Titan?",
+        "mindless_inject_msg": "💉 **{user}** was injected by **{injector}** and became a Mindless Titan!",
+        "mindless_no_syringe": "❌ You don't have the syringe ({item}).",
+        "mindless_no_fluid": "❌ You don't have the fluid ({item}).",
+        "eat_reason_field": "Reason for refusing",
+        "mindless_eat_refused": "❌ **{target}** refused: {reason}",
+        "select_target": "Select Target",
+        "grab_btn": "✊ Grab",
+        "eat_btn": "🦷 Eat",
+        "shifter_grab_msg": "✊ **{name}** grabs **{target}**!",
+        "shifter_eat_ask_body": "**{eater}** is trying to eat you! Do you accept?",
+        "shifter_ate_shifter_msg": "💀 **{eater}** ate **{target}** and gained the **{titan}** power!",
+        "shifter_ate_normal_msg": "💀 **{eater}** ate **{target}**!",
+        "upgrade_ability_btn": "⬆️ Upgrade Ability",
+        "upgrade_title": "⬆️ Upgrade Ability",
+        "upgrade_cd_btn": "⏱ Reduce Cooldown (-5m)",
+        "upgrade_cost_btn": "💪 Reduce Stamina Cost (-5)",
+        "upgrade_not_enough": "❌ Insufficient funds. Need {cost}.",
+        "upgrade_done": "✅ Upgrade successful!",
+        "customize_form_btn": "🎨 Customize Form",
+        "customize_form_title": "🎨 Customize Titan Form",
+        "form_display_name_field": "Display Name (empty = use titan name)",
+        "form_image_field": "Image URL (optional)",
+        "form_desc_field": "Form description (optional)",
+        "form_saved": "✅ Form customization saved.",
+        "backstory_tab": "📖 Backstory",
+        "journal_tab": "📔 Journal",
+        "backstory_empty": "No backstory yet.",
+        "journal_empty": "No journal entries yet.",
+        "add_journal_btn": "➕ Add Entry",
+        "edit_backstory_btn": "✏️ Edit Backstory",
+        "journal_entry_field": "Journal Entry",
+        "journal_public_btn": "🌐 Public",
+        "journal_private_btn": "🔒 Private",
+        "journal_delete_btn": "🗑️ Delete",
+        "backstory_field": "Backstory",
+        "logs_setup_title": "📊 Logs Setup",
+        "logs_channel_label": "Logs Channel",
+        "create_logs_channel_btn": "🔧 Create Logs Channel",
+        "set_logs_channel_btn": "📌 Set Channel",
+        "logs_channel_set_msg": "✅ Logs channel set.",
+        "logs_channel_created_msg": "✅ Created logs channel #{name}.",
+        "logs_no_channel": "❌ No logs channel configured.",
+        "logs_categories_btn": "📂 Categories",
+        "view_logs_btn": "👁️ View Logs",
+        "no_logs_entries": "No logs yet.",
+        "backup_title": "💾 Backup & Restore",
+        "backup_create_btn": "📦 Create Backup",
+        "backup_restore_btn": "🔄 Restore Backup",
+        "backup_created_msg": "✅ Backup created successfully.",
+        "backup_restored_msg": "✅ Data restored successfully.",
+        "backup_upload_prompt": "Upload the backup .zip file in your next message within 60 seconds.",
+        "backup_invalid_file": "❌ No valid file found or invalid format.",
     },
 }
 
@@ -476,8 +811,121 @@ def load_shops(guild_id: int) -> dict:
 def save_shops(guild_id: int, data: dict):
     _save_json(DATA_DIR / f"shops_{guild_id}.json", data)
 
+def load_missions(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"missions_{guild_id}.json", lambda: {"missions": {}})
+
+def save_missions(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"missions_{guild_id}.json", data)
+
+def load_jobs(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"jobs_{guild_id}.json", lambda: {"jobs": {}})
+
+def save_jobs(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"jobs_{guild_id}.json", data)
+
+def load_squads(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"squads_{guild_id}.json", lambda: {"squads": {}})
+
+def save_squads(guild_id: int, data: dict):
+    _save_json(DATA_DIR / f"squads_{guild_id}.json", data)
+
+def load_logs_data(guild_id: int) -> dict:
+    return _load_json(DATA_DIR / f"logs_{guild_id}.json", lambda: {"entries": []})
+
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
+
+def save_logs_data(guild_id: int, data: dict):
+    entries = data.get("entries", [])
+    if len(entries) > 500:
+        data["entries"] = entries[-500:]
+    _save_json(DATA_DIR / f"logs_{guild_id}.json", data)
+
+
+async def log_event(bot_instance, guild_id: int, category: str, text: str) -> None:
+    import time as _time, discord as _d
+    cfg = load_config(guild_id)
+    cats = cfg.get("logs_categories", {})
+    if cats and not cats.get(category, True):
+        return
+    data = load_logs_data(guild_id)
+    data["entries"].append({"category": category, "text": text, "ts": _time.time()})
+    save_logs_data(guild_id, data)
+    ch_id = cfg.get("logs_channel")
+    if not ch_id:
+        return
+    for g in bot_instance.guilds:
+        if g.id == guild_id:
+            ch = g.get_channel(int(ch_id))
+            if ch:
+                try:
+                    v = _d.ui.LayoutView(timeout=None)
+                    v.add_item(_d.ui.Container(_d.ui.TextDisplay(f"[{category.upper()}] {text}")))
+                    await ch.send(view=v)
+                except Exception:
+                    pass
+            break
+
+
+def add_xp(guild_id: int, user_id: int, amount: int) -> tuple:
+    players = load_players(guild_id)
+    player  = players.get(str(user_id), {})
+    if not player:
+        return (0, 1, False)
+    old_level = _get_level(player.get("xp", 0))
+    player["xp"] = player.get("xp", 0) + amount
+    new_level    = _get_level(player["xp"])
+    leveled_up   = new_level > old_level
+    if leveled_up:
+        player["level"] = new_level
+    players[str(user_id)] = player
+    save_players(guild_id, players)
+    return (player["xp"], new_level, leveled_up)
+
+
+def _get_level(xp: int) -> int:
+    level = 1
+    while xp >= _xp_for_level(level + 1):
+        level += 1
+        if level >= 100:
+            break
+    return level
+
+
+def _xp_for_level(level: int) -> int:
+    return 100 * (level ** 2)
+
+
+def format_full_player_info(player: dict, display_name: str, guild_id: int) -> str:
+    lines = [
+        f"**Discord:** {display_name}",
+        f"**{t(guild_id,'name_label')}:** {player.get('name','?')}",
+        f"**{t(guild_id,'age_label')}:** {player.get('age','?')}",
+        f"**{t(guild_id,'gender_label')}:** {player.get('gender','?')}",
+        f"**{t(guild_id,'faction_label')}:** {player.get('faction','?')}",
+        f"**{t(guild_id,'rank_label')}:** {player.get('rank','?')}",
+        f"**{t(guild_id,'bloodline_label')}:** {player.get('bloodline','?')}",
+        f"**{t(guild_id,'balance_label')}:** {player.get('balance',0)}",
+    ]
+    inv = player.get("inventory", {})
+    if inv:
+        items_data = load_items(guild_id)
+        all_items  = items_data.get("items", {})
+        inv_lines  = [f"  • {all_items.get(iid,{}).get('name',iid)} × {qty}"
+                      for iid, qty in list(inv.items())[:10] if qty > 0]
+        if inv_lines:
+            lines.append(f"**{t(guild_id,'inventory_btn')}:**")
+            lines += inv_lines
+    return "\n".join(lines)
+
+
+def get_player_squad(guild_id: int, user_id: int):
+    db = load_squads(guild_id)
+    for sid, sq in db.get("squads", {}).items():
+        if str(user_id) in sq.get("members", {}):
+            return sid, sq
+    return None, None
+
 
 def slugify(name: str) -> str:
     name = name.lower().strip()
