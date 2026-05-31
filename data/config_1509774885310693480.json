@@ -1,0 +1,169 @@
+{
+  "language": "th",
+  "roles": {
+    "faction": {},
+    "rank": {},
+    "shifter": {
+      "Attack Titan": "1510278520826499073"
+    },
+    "bloodline": {}
+  },
+  "factions": [
+    "Survey Corps",
+    "Military Police",
+    "Garrison",
+    "Stationary Guard",
+    "Merchants",
+    "Civilian"
+  ],
+  "ranks": [
+    "Cadet",
+    "Soldier",
+    "Section Commander",
+    "Commander",
+    "General"
+  ],
+  "faction_roles": [
+    {
+      "name": "Recruit",
+      "image": "https://cdn.discordapp.com/attachments/1510115596992249886/1510115638541160448/IMG_2951.png",
+      "ranks": [
+        {
+          "name": "Cadet",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Survey Corps",
+      "image": "https://cdn.discordapp.com/attachments/1510115596992249886/1510115664755425400/IMG_2955.png",
+      "ranks": [
+        {
+          "name": "Soldier",
+          "visible": true
+        },
+        {
+          "name": "Section Commander",
+          "visible": false
+        },
+        {
+          "name": "Commander",
+          "visible": false
+        },
+        {
+          "name": "General",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "name": "Military Police",
+      "image": "https://cdn.discordapp.com/attachments/1510115596992249886/1510115645906227240/IMG_2953.png",
+      "ranks": [
+        {
+          "name": "Cadet",
+          "visible": true
+        },
+        {
+          "name": "MP Soldier",
+          "visible": false
+        },
+        {
+          "name": "MP Officer",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "name": "Garrison",
+      "image": "",
+      "ranks": [
+        {
+          "name": "Cadet",
+          "visible": true
+        },
+        {
+          "name": "Soldier",
+          "visible": false
+        },
+        {
+          "name": "Officer",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "name": "Stationary Guard",
+      "image": "https://cdn.discordapp.com/attachments/1510115596992249886/1510115652784885831/IMG_2954.png",
+      "ranks": [
+        {
+          "name": "Guard",
+          "visible": true
+        },
+        {
+          "name": "Commander",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "name": "Merchants",
+      "image": "",
+      "ranks": [
+        {
+          "name": "Merchant",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Civilian",
+      "image": "",
+      "ranks": [
+        {
+          "name": "Civilian",
+          "visible": true
+        }
+      ]
+    }
+  ],
+  "rank_access": {},
+  "shifters": [
+    "Attack Titan",
+    "Armored Titan",
+    "Colossal Titan",
+    "Female Titan",
+    "Beast Titan",
+    "Jaw Titan",
+    "Cart Titan",
+    "War Hammer Titan",
+    "Founding Titan"
+  ],
+  "bloodlines_common": [
+    "Eldian",
+    "Half-Eldian"
+  ],
+  "bloodlines_special": [
+    "Ackerman",
+    "Royal Eldian"
+  ],
+  "special_access": {},
+  "shifter_access": [
+    "1083622448982925393"
+  ],
+  "titan_time_days": 4745,
+  "titan_announcement_channel": null,
+  "pending_moveset_requests": {},
+  "stamina_regen_per_minute": 1,
+  "stamina_regen_interval_minutes": 5,
+  "stamina_regen_amount": 5,
+  "auto_deform_cooldown_minutes": 60,
+  "transform_min_stamina": 30,
+  "announcement_channels": [
+    "1509905396066816100"
+  ],
+  "announcement_permitted_roles": [],
+  "currency_name": "เงิน",
+  "currency_emoji": "",
+  "currency_image": ""
+}

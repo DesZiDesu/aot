@@ -1,0 +1,68 @@
+{
+  "1083622448982925393": {
+    "name": "Hesia",
+    "age": "18",
+    "gender": "ชาย",
+    "appearance": "ไม่บอก",
+    "image": "https://cdn.discordapp.com/attachments/1510115596992249886/1510346146403586213/IMG_2936.png",
+    "faction": "Recruit",
+    "rank": "Cadet",
+    "bloodline": "Eldian",
+    "shifter": "Attack Titan",
+    "inventory": {
+      "strawberry": 0
+    },
+    "titan_powers": [
+      {
+        "titan": "Attack Titan",
+        "acquired_at": 1780164162.9030635,
+        "expires_at": 2190132162.903064,
+        "abilities": [
+          {
+            "name": "Test Kick",
+            "description": "Powerful Kick",
+            "cooldown_minutes": 30,
+            "stamina_cost": 10
+          },
+          {
+            "name": "Regeneration",
+            "description": "ฟื้นฟูร่างกาย",
+            "cooldown_minutes": 10,
+            "stamina_cost": 30
+          },
+          {
+            "name": "Powerful Punch",
+            "description": "ต่อยหมัดออกไปแบบทรงพลัง",
+            "cooldown_minutes": 3,
+            "stamina_cost": 30
+          },
+          {
+            "name": "Powerful Kick",
+            "description": "ลูกเตะตัดขา",
+            "cooldown_minutes": 3,
+            "stamina_cost": 35
+          },
+          {
+            "name": "Rapid Regeneration",
+            "description": "ฟื้นฟูร่างกายความเร็วสูง",
+            "image_url": "",
+            "cooldown_minutes": 1,
+            "stamina_cost": 50,
+            "confirmed": true
+          }
+        ]
+      }
+    ],
+    "stamina": 50,
+    "max_stamina": 100,
+    "ability_cooldowns": {
+      "Attack Titan:Test Kick": 1780194009.2515993,
+      "Attack Titan:Regeneration": 1780192719.9827123,
+      "Attack Titan:Powerful Punch": 1780165763.7128007,
+      "Attack Titan:Rapid Regeneration": 1780192251.5208411
+    },
+    "transformed": false,
+    "deceased": false,
+    "stamina_last_regen": 1780194797.888653
+  }
+}
