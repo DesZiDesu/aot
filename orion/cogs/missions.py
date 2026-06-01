@@ -126,6 +126,9 @@ def _mission_notif_embed(gid: int, mid: str, m: dict) -> discord.Embed:
         value=t_orion(gid, "mission_join_instr"),
         inline=False,
     )
+    img = m.get("image_url", "")
+    if img:
+        embed.set_image(url=img)
     embed.set_footer(text=f"ID: {mid}  ·  Use /missions to view all  ·  ใช้ /missions ดูทั้งหมด")
     return embed
 
@@ -950,6 +953,11 @@ class CreateMissionModal(discord.ui.Modal, title="New Mission / ภารกิ�
         max_length=5,
         required=False,
     )
+    image_f = discord.ui.TextInput(
+        label="Image URL / ลิงก์รูปภาพ  (optional)",
+        max_length=500,
+        required=False,
+    )
 
     def __init__(self, gid: int):
         super().__init__()
@@ -969,6 +977,9 @@ class CreateMissionModal(discord.ui.Modal, title="New Mission / ภารกิ�
         except ValueError:
             max_p = 0
 
+        raw_img = self.image_f.value.strip()
+        image_url = raw_img if raw_img.startswith(("http://", "https://")) else ""
+
         mid      = str(uuid.uuid4())[:8]
         missions = load_missions(gid)
         missions[mid] = {
@@ -979,6 +990,7 @@ class CreateMissionModal(discord.ui.Modal, title="New Mission / ภารกิ�
             "reward_items":   {},
             "max_players":    max_p,
             "players":        [],
+            "image_url":      image_url,
             "created_by":     str(ix.user.id),
             "created_at":     time.time(),
             "status":         "open",
