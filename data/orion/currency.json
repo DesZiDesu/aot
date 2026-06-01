@@ -1,0 +1,8 @@
+{
+  "name": "Gold",
+  "emoji": "💰",
+  "icon_url": "https://cdn.discordapp.com/attachments/1499354553953292368/1509321523071287451/IMG_2792.gif?ex=6a18c0b4&is=6a176f34&hm=8b6d5247d1df1bebcfcf988c2b257129edafd71286a79e456448b06e330c5593&",
+  "start_balance": 100,
+  "guild_create_cost": 200,
+  "guild_slot_cost": 100
+}

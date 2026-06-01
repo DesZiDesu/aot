@@ -1,0 +1,101 @@
+{
+  "areas": {
+    "orion_city": {
+      "name": "ORION CITY",
+      "subtitle": "เขตการปกครองโอไรอ้อน",
+      "emoji": "🏙️"
+    },
+    "wilderness": {
+      "name": "WILDERNESS",
+      "subtitle": "กำแพงสู่นอกอาณาจักร",
+      "emoji": "🌲"
+    },
+    "tandria_beach": {
+      "name": "TANDRIA BEACH",
+      "subtitle": "เขตชายหาดทันเดรีย",
+      "emoji": "🏖️"
+    },
+    "red_light": {
+      "name": "RED LIGHT DISTRICT",
+      "subtitle": "ย่านโคมแดง",
+      "emoji": "🌃"
+    },
+    "playful_bunny": {
+      "name": "PLAYFUL BUNNY",
+      "subtitle": "บันนี่คลับ",
+      "emoji": "🎰"
+    }
+  },
+  "weathers": {
+    "sunny": {
+      "name": "แดดจ้า",
+      "emoji": "☀️",
+      "desc": "ท้องฟ้าโปร่ง แสงอบอุ่นสาดทั่วเขต"
+    },
+    "cloudy": {
+      "name": "เมฆครึ้ม",
+      "emoji": "☁️",
+      "desc": "เมฆหนาทึบเข้าปกคลุม แสงแดดถูกบดบัง"
+    },
+    "rainy": {
+      "name": "ฝนพรำ",
+      "emoji": "🌦️",
+      "desc": "ฝนบางๆ พรำลงมาเป็นช่วงๆ พื้นชื้นเย็น"
+    },
+    "storm": {
+      "name": "พายุฝน",
+      "emoji": "⛈️",
+      "desc": "ลมแรง ฟ้าผ่าฉีกท้องฟ้า ฝนสาดหนัก"
+    },
+    "thunder": {
+      "name": "ฟ้าคำราม",
+      "emoji": "🌩️",
+      "desc": "ฟ้าผ่ารัวๆ แม้ฝนยังไม่ตก"
+    },
+    "snowy": {
+      "name": "หิมะตก",
+      "emoji": "🌨️",
+      "desc": "เกล็ดหิมะร่วงโปรยทั่วบริเวณ พื้นเป็นสีขาว"
+    },
+    "fog": {
+      "name": "หมอกหนา",
+      "emoji": "🌫️",
+      "desc": "หมอกหนาทึบ มองไม่เห็นเกิน 3 เมตร"
+    },
+    "windy": {
+      "name": "ลมแรง",
+      "emoji": "💨",
+      "desc": "ลมพัดแรงจนต้นไม้เอน"
+    },
+    "hot": {
+      "name": "ร้อนระอุ",
+      "emoji": "🔥",
+      "desc": "อากาศร้อนจัด เหงื่อไหลทั้งวัน"
+    },
+    "cold": {
+      "name": "หนาวจัด",
+      "emoji": "🥶",
+      "desc": "อุณหภูมิดิ่ง ลมหายใจกลายเป็นไอ"
+    },
+    "clear_night": {
+      "name": "ดาวเต็มฟ้า",
+      "emoji": "🌌",
+      "desc": "ท้องฟ้าใส ดาวกระจายเต็ม มองเห็นทางช้างเผือก"
+    },
+    "drizzle": {
+      "name": "ฝนปรอย",
+      "emoji": "💧",
+      "desc": "ฝนเม็ดเล็กๆ ตกเบาๆ อย่างเงียบเชียบ"
+    }
+  },
+  "current": {
+    "orion_city": "windy",
+    "wilderness": "thunder",
+    "tandria_beach": "fog",
+    "red_light": "snowy",
+    "playful_bunny": "hot"
+  },
+  "display_channel_id": 1508765795768074322,
+  "last_update": 1780117359,
+  "last_message_id": 1509182230348562492
+}

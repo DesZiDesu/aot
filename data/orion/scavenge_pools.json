@@ -1,0 +1,131 @@
+{
+  "herbs": {
+    "name": "Herbs",
+    "emoji": "<:emoji_95:1509524173041565826>",
+    "icon_url": "",
+    "description": "หมวดหมู่สมุนไพร",
+    "minigames": [
+      "math_quick",
+      "click_target"
+    ],
+    "items": [
+      {
+        "item_id": "ใบจันทร์หมอก",
+        "weight": 5,
+        "rarity": "uncommon",
+        "qty": 1
+      },
+      {
+        "item_id": "ใบหญ้าราตรี",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      }
+    ]
+  },
+  "fruits": {
+    "name": "Fruits",
+    "emoji": "<:emoji_98:1509530106379636857>",
+    "icon_url": "",
+    "description": "หมวดหมู่ผลไม้",
+    "minigames": [
+      "odd_one_out",
+      "number_sort"
+    ],
+    "items": [
+      {
+        "item_id": "สตรอว์เบอร์รี",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      },
+      {
+        "item_id": "องุ่น",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      },
+      {
+        "item_id": "มะเขือเทศ",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      },
+      {
+        "item_id": "กล้วย",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      },
+      {
+        "item_id": "มะเขือม่วง",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      },
+      {
+        "item_id": "ผลไม้ส้ม",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      }
+    ]
+  },
+  "wheat": {
+    "name": "Wheat",
+    "emoji": "<:emoji_105:1509535145323921549>",
+    "icon_url": "",
+    "description": "วัตถุดิบเมล็ดข้าว",
+    "minigames": [
+      "odd_one_out"
+    ],
+    "items": [
+      {
+        "item_id": "เมล็ดข้าว",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      }
+    ]
+  },
+  "ingredients": {
+    "name": "Ingredients",
+    "emoji": "<:emoji_106:1509535164383105054>",
+    "icon_url": "",
+    "description": "วัตถุดิบทำอาหาร",
+    "minigames": [
+      "guess_number"
+    ],
+    "items": [
+      {
+        "item_id": "ถังนมวัว",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      },
+      {
+        "item_id": "ไข่",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      }
+    ]
+  },
+  "consumable": {
+    "name": "Consumable",
+    "emoji": "<:emoji_112:1509543272035389530>",
+    "icon_url": "",
+    "description": "วัตถุดิบหรือของที่สามารถทานได้ เช่น น้ำ / เนื้อ",
+    "minigames": [
+      "rps"
+    ],
+    "items": [
+      {
+        "item_id": "ถังใส่น้ำ",
+        "weight": 5,
+        "rarity": "common",
+        "qty": 1
+      }
+    ]
+  }
+}
