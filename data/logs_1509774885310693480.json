@@ -1,0 +1,44 @@
+{
+  "entries": [
+    {
+      "category": "shifter",
+      "text": "WHITE grabbed <@1333070533914525707>",
+      "ts": 1780195725.034612
+    },
+    {
+      "category": "shifter",
+      "text": "WHITE tried to eat <@1333070533914525707>",
+      "ts": 1780195731.5362155
+    },
+    {
+      "category": "mindless",
+      "text": "WHITE injected WHITE",
+      "ts": 1780195792.63329
+    },
+    {
+      "category": "mindless",
+      "text": "WHITE injected MARIA",
+      "ts": 1780196300.5962148
+    },
+    {
+      "category": "mindless",
+      "text": "MARIA grabbed <@1083622448982925393>",
+      "ts": 1780196361.6129026
+    },
+    {
+      "category": "mindless",
+      "text": "MARIA tried to eat <@1083622448982925393>",
+      "ts": 1780196368.0306125
+    },
+    {
+      "category": "shifter",
+      "text": "WHITE tried to eat <@200608326327730176>",
+      "ts": 1780196494.4069016
+    },
+    {
+      "category": "mindless",
+      "text": "WHITE tried to eat <@835475215953690644>",
+      "ts": 1780226132.07812
+    }
+  ]
+}
