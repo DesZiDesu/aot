@@ -137,6 +137,16 @@ def _review_embed(entry: dict, status_line: str = "") -> discord.Embed:
             lines.append(f"**Drawback:**\n{data['drawback']}")
         lines.append(f"**Rank:** {data.get('rank','—')}")
         description = "\n".join(lines)
+    elif etype == "craft":
+        title = "⚒️ คำขอ Craft"
+        color = 0x9b59b6
+        mats  = data.get("materials", [])
+        mat_lines = [f"• {m['name']} × {m['qty']}" for m in mats] or ["—"]
+        note  = data.get("note", "")
+        lines = ["**วัสดุที่ใช้:**"] + mat_lines
+        if note:
+            lines.append(f"\n**โน้ต:**\n{note}")
+        description = "\n".join(lines)
     else:
         title  = "🔨 คำขอสร้าง Item"
         color  = 0x3498db
@@ -157,7 +167,7 @@ def _review_embed(entry: dict, status_line: str = "") -> discord.Embed:
     return embed
 
 
-def _approve_dm_embed(entry: dict) -> discord.Embed:
+def _approve_dm_embed(entry: dict, admin_note: str = "") -> discord.Embed:
     etype = entry.get("type", "?")
     data  = entry.get("data", {})
     if etype == "skill":
@@ -169,6 +179,16 @@ def _approve_dm_embed(entry: dict) -> discord.Embed:
             ),
             color=0x2ecc71,
         )
+    elif etype == "craft":
+        mats = data.get("materials", [])
+        mat_str = ", ".join(f"{m['name']} ×{m['qty']}" for m in mats) or "—"
+        embed = discord.Embed(
+            title="✅ คำขอ Craft ของคุณได้รับการอนุมัติ!",
+            description=f"**วัสดุ:** {mat_str}",
+            color=0x2ecc71,
+        )
+        if admin_note:
+            embed.add_field(name="ข้อความจาก Admin", value=admin_note, inline=False)
     else:
         embed = discord.Embed(
             title="✅ Item ของคุณได้รับการอนุมัติ!",
@@ -186,12 +206,17 @@ def _approve_dm_embed(entry: dict) -> discord.Embed:
 def _decline_dm_embed(entry: dict, reason: str) -> discord.Embed:
     etype = entry.get("type", "?")
     data  = entry.get("data", {})
-    name  = data.get("name", "?")
-    label = "Artifact Skill" if etype == "skill" else "Item"
+    if etype == "craft":
+        mats = data.get("materials", [])
+        name = ", ".join(m["name"] for m in mats[:3]) + ("…" if len(mats) > 3 else "")
+        label = "Craft"
+    else:
+        name  = data.get("name", "?")
+        label = "Artifact Skill" if etype == "skill" else "Item"
     embed = discord.Embed(
         title=f"❌ คำขอสร้าง {label} ถูกปฏิเสธ",
         description=(
-            f"**ชื่อ:** {name}\n"
+            f"**วัสดุ/ชื่อ:** {name}\n"
             f"**เหตุผล:** {reason or '_(ไม่ระบุ)_'}"
         ),
         color=0xe74c3c,
@@ -407,7 +432,10 @@ class CreationReviewView(discord.ui.View):
 
     @discord.ui.button(label="✅ อนุมัติ", style=discord.ButtonStyle.success, row=0)
     async def btn_approve(self, ix: discord.Interaction, _btn: discord.ui.Button):
-        await self._do_approve(ix)
+        if self.entry.get("type") == "craft":
+            await ix.response.send_modal(_CraftApproveModal(self.entry, self.review_message_ref))
+        else:
+            await self._do_approve(ix)
 
     @discord.ui.button(label="❌ ปฏิเสธ", style=discord.ButtonStyle.danger, row=0)
     async def btn_decline(self, ix: discord.Interaction, _btn: discord.ui.Button):
@@ -503,6 +531,217 @@ class CreationReviewView(discord.ui.View):
         await ix.response.send_message("✅ อนุมัติคำขอแล้ว", ephemeral=True)
 
 
+# ── Craft Approval Modal ──────────────────────────────────────
+
+class _CraftApproveModal(discord.ui.Modal, title="อนุมัติ Craft"):
+    f_note = discord.ui.TextInput(
+        label="ข้อความถึงผู้เล่น (ไม่บังคับ)",
+        style=discord.TextStyle.paragraph,
+        max_length=300,
+        required=False,
+        placeholder="เช่น: ได้รับ Iron Sword แล้ว / จะส่ง DM ทีหลัง…",
+    )
+
+    def __init__(self, entry: dict, review_message_ref: list):
+        super().__init__()
+        self.entry = entry
+        self.review_message_ref = review_message_ref
+
+    async def on_submit(self, ix: discord.Interaction):
+        pid = self.entry.get("id")
+        creator_uid = self.entry.get("creator_uid")
+        admin_note = self.f_note.value.strip()
+
+        _update_pending_status(pid, "approved")
+
+        status_line = f"✅ อนุมัติแล้ว by {ix.user.mention}"
+        if admin_note:
+            status_line += f"\n**หมายเหตุ:** {admin_note}"
+        new_embed = _review_embed(self.entry, status_line=status_line)
+
+        review_msg = self.review_message_ref[0]
+        if review_msg is None:
+            review_msg = ix.message
+        try:
+            await review_msg.edit(embed=new_embed, view=None)
+        except Exception:
+            pass
+
+        if creator_uid:
+            try:
+                user = await bot.fetch_user(int(creator_uid))
+                await user.send(embed=_approve_dm_embed(self.entry, admin_note))
+            except Exception:
+                pass
+
+        await ix.response.send_message("✅ อนุมัติคำขอ Craft แล้ว", ephemeral=True)
+
+
+# ── Craft Draft View ──────────────────────────────────────────
+
+class CraftDraftView(discord.ui.View):
+    """Draft view for crafting — player selects raw materials from inventory."""
+
+    def __init__(self, uid: str, inv_materials: list, draft: dict = None):
+        super().__init__(timeout=300)
+        self.uid = uid
+        self.inv_materials = inv_materials  # [{"item_id", "name", "qty", "description"}]
+        self.draft = draft or {}            # {item_id: {"name", "qty"}}
+        self._build()
+
+    def _build(self):
+        self.clear_items()
+        if self.inv_materials:
+            opts = [
+                discord.SelectOption(
+                    label=f"{m['name']} (มี {m['qty']})",
+                    value=m["item_id"],
+                    description=(m.get("description") or "")[:100],
+                )
+                for m in self.inv_materials[:25]
+            ]
+            sel = discord.ui.Select(placeholder="เลือกวัสดุ…", options=opts, row=0)
+            sel.callback = self._on_select
+            self.add_item(sel)
+
+        clear_btn = discord.ui.Button(label="ล้างแบบร่าง", style=discord.ButtonStyle.secondary, row=1)
+        clear_btn.callback = self._clear
+        self.add_item(clear_btn)
+
+        if self.draft:
+            submit_btn = discord.ui.Button(label="✅ ส่งคำขอ Craft", style=discord.ButtonStyle.success, row=1)
+            submit_btn.callback = self._submit
+            self.add_item(submit_btn)
+
+        cancel_btn = discord.ui.Button(label="ยกเลิก", style=discord.ButtonStyle.danger, row=1)
+        cancel_btn.callback = self._cancel
+        self.add_item(cancel_btn)
+
+    def _embed(self) -> discord.Embed:
+        embed = discord.Embed(title="⚒️ Crafting — แบบร่าง", color=0x9b59b6)
+        if self.draft:
+            lines = [f"• **{v['name']}** × {v['qty']}" for v in self.draft.values()]
+            embed.description = "\n".join(lines)
+            embed.set_footer(text=f"วัสดุ {len(self.draft)}/10 ชนิด")
+        else:
+            embed.description = "*ยังไม่มีวัสดุ — เลือกจาก dropdown ด้านล่าง*"
+        return embed
+
+    async def _on_select(self, ix: discord.Interaction):
+        item_id = ix.data["values"][0]
+        item = next((m for m in self.inv_materials if m["item_id"] == item_id), None)
+        if not item:
+            await ix.response.defer(); return
+        if item_id not in self.draft and len(self.draft) >= 10:
+            await ix.response.send_message("สามารถเพิ่มได้สูงสุด 10 ชนิด", ephemeral=True); return
+        current_qty = self.draft.get(item_id, {}).get("qty", 1)
+        await ix.response.send_modal(
+            _CraftQtyModal(self, item_id, item["name"], item["qty"], current_qty)
+        )
+
+    async def _clear(self, ix: discord.Interaction):
+        self.draft.clear(); self._build()
+        await ix.response.edit_message(embed=self._embed(), view=self)
+
+    async def _submit(self, ix: discord.Interaction):
+        await ix.response.send_modal(_CraftNoteModal(self))
+
+    async def _cancel(self, ix: discord.Interaction):
+        embed = discord.Embed(description="*ยกเลิกการ Craft แล้ว*", color=0x2f3136)
+        self.clear_items()
+        await ix.response.edit_message(embed=embed, view=None)
+
+
+class _CraftQtyModal(discord.ui.Modal, title="ใส่จำนวนวัสดุ"):
+    f_qty = discord.ui.TextInput(label="จำนวน", max_length=5, placeholder="1")
+
+    def __init__(self, parent: CraftDraftView, item_id: str, name: str, max_qty: int, current_qty: int):
+        super().__init__()
+        self.parent = parent
+        self.item_id = item_id
+        self.name = name
+        self.max_qty = max_qty
+        self.f_qty.label = f"จำนวน (มีอยู่ {max_qty} ชิ้น)"
+        self.f_qty.default = str(current_qty)
+
+    async def on_submit(self, ix: discord.Interaction):
+        try:
+            qty = int(self.f_qty.value.strip())
+        except ValueError:
+            await ix.response.send_message("จำนวนไม่ถูกต้อง", ephemeral=True); return
+        if qty <= 0:
+            self.parent.draft.pop(self.item_id, None)
+        elif qty > self.max_qty:
+            await ix.response.send_message(f"มีแค่ {self.max_qty} ชิ้น", ephemeral=True); return
+        else:
+            self.parent.draft[self.item_id] = {"name": self.name, "qty": qty}
+        self.parent._build()
+        await ix.response.edit_message(embed=self.parent._embed(), view=self.parent)
+
+
+class _CraftNoteModal(discord.ui.Modal, title="โน้ตสำหรับ Admin"):
+    f_note = discord.ui.TextInput(
+        label="สิ่งที่ต้องการสร้าง / รายละเอียด",
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=False,
+        placeholder="อธิบายว่าต้องการสร้างอะไรจากวัสดุเหล่านี้…",
+    )
+
+    def __init__(self, parent: CraftDraftView):
+        super().__init__()
+        self.parent = parent
+
+    async def on_submit(self, ix: discord.Interaction):
+        from orion_items import remove_player_item, player_qty
+        uid   = self.parent.uid
+        draft = self.parent.draft
+        note  = self.f_note.value.strip()
+
+        for item_id, info in draft.items():
+            if player_qty(uid, item_id) < info["qty"]:
+                await ix.response.send_message(
+                    f"วัสดุ **{info['name']}** ไม่เพียงพอแล้ว", ephemeral=True
+                ); return
+
+        for item_id, info in draft.items():
+            remove_player_item(uid, item_id, info["qty"])
+
+        materials = [{"item_id": k, "name": v["name"], "qty": v["qty"]} for k, v in draft.items()]
+        entry = {
+            "id":          _new_uid(),
+            "type":        "craft",
+            "creator_uid": uid,
+            "status":      "pending",
+            "data":        {"materials": materials, "note": note},
+        }
+        lst = load_pending()
+        lst.append(entry)
+        save_pending(lst)
+
+        cfg = load_creation_cfg()
+        review_ch_id = cfg.get("review_channel_id")
+        if review_ch_id and ix.guild:
+            ch = ix.guild.get_channel(int(review_ch_id))
+            if ch:
+                ref = [None]
+                msg = await ch.send(embed=_review_embed(entry), view=CreationReviewView(entry, ref))
+                ref[0] = msg
+
+        embed = discord.Embed(
+            title="✅ ส่งคำขอ Craft แล้ว",
+            description=(
+                f"วัสดุ **{len(materials)}** ชนิดถูกนำออกจาก inventory แล้ว\n"
+                "รอ Admin ตรวจสอบและอนุมัติ"
+            ),
+            color=0x2ecc71,
+        )
+        self.parent.clear_items()
+        await ix.response.edit_message(embed=embed, view=None)
+
+
+# ── Creation Type Select ──────────────────────────────────────
+
 class CreationTypeView(discord.ui.View):
     """View ให้ผู้เล่นเลือกประเภทที่จะสร้าง"""
 
@@ -517,6 +756,32 @@ class CreationTypeView(discord.ui.View):
     @discord.ui.button(label="📦 Item", style=discord.ButtonStyle.secondary, row=0)
     async def btn_item(self, ix: discord.Interaction, _btn: discord.ui.Button):
         await ix.response.send_modal(CreateItemModal(self.creator_uid))
+
+    @discord.ui.button(label="⚒️ Craft", style=discord.ButtonStyle.success, row=0)
+    async def btn_craft(self, ix: discord.Interaction, _btn: discord.ui.Button):
+        from orion_items import get_player_inv, load_items_catalog
+        uid = self.creator_uid
+        inv = get_player_inv(uid)
+        cat = load_items_catalog()
+        materials = []
+        for entry in inv:
+            item_id = entry.get("item_id", "")
+            qty = int(entry.get("qty", 0))
+            if qty <= 0: continue
+            item = cat.get(item_id, {})
+            if item.get("type", "").lower() == "material":
+                materials.append({
+                    "item_id": item_id,
+                    "name": item.get("name", item_id),
+                    "qty": qty,
+                    "description": item.get("description", ""),
+                })
+        if not materials:
+            await ix.response.send_message(
+                "❌ ไม่มีวัสดุ (material) ใน inventory ของคุณ", ephemeral=True
+            ); return
+        view = CraftDraftView(uid, materials)
+        await ix.response.edit_message(embed=view._embed(), view=view)
 
 
 # ── Admin Views ───────────────────────────────────────────────

@@ -65,6 +65,10 @@ DEFAULT_CONFIG = {
     "mindless_syringe_item": "",
     "mindless_fluid_item": "",
     "xp_enabled": True,
+    "required_creation_role_id": None,
+    "mindless_role_id": None,
+    "bloodlines_immune_mindless": [],
+    "bloodlines_immune_shifter": [],
 }
 
 # ── i18n ─────────────────────────────────────────────────────────────────────
