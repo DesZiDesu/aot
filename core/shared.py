@@ -1058,7 +1058,7 @@ def get_faction_emblem(guild_id: int, faction_name: str) -> str:
 
 def can_become_mindless(guild_id: int, player: dict) -> tuple:
     """Returns (allowed: bool, reason_key: str)."""
-    if player.get("titan_power"):
+    if player.get("titan_powers") or player.get("titan_power"):
         return False, "mindless_cannot_inject_shifter"
     cfg = load_config(guild_id)
     bl = player.get("bloodline", "")
