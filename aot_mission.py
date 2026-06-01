@@ -188,12 +188,14 @@ class MissionListView(discord.ui.View):
                 if g.id == self.gid:
                     for member in g.members:
                         if member.guild_permissions.administrator:
-                            await cv2_dm(member, t(self.gid, "mission_notify_admin",
-                                                   user=display, mission=m["name"]))
+                            try:
+                                await cv2_dm(member, t(self.gid, "mission_notify_admin",
+                                                       user=display, mission=m["name"]))
+                            except Exception:
+                                pass
                     break
-            await ix.response.send_message(t(self.gid, "mission_joined", name=m["name"]), ephemeral=True)
             self._build()
-            await ix.edit_original_response(embed=self._embed(), view=self)
+            await ix.response.edit_message(embed=self._embed(), view=self)
         return _join
 
     def _make_view(self, mid):
@@ -710,7 +712,7 @@ async def _post_to_board_channels(gid: int, mission: dict, guild):
     """Post mission announcement to all board channels."""
     if not guild: return
     cfg = load_config(gid)
-    board_chs = cfg.get("board_channel_ids", []) or mission.get("channels", [])
+    board_chs = cfg.get("mission_channels", []) or mission.get("channels", [])
     embed = discord.Embed(
         title=f"📋 New Mission: {mission['name']}",
         description=mission.get("description", ""),

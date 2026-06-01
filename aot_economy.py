@@ -1,4 +1,5 @@
 """Economy system — balance, transfer, admin money management."""
+import re
 import discord
 from discord import app_commands
 
@@ -68,7 +69,7 @@ class _TransferModal(discord.ui.Modal, title="Transfer Coins"):
         gid = self.gid
         cfg = load_config(gid)
         uid_str = str(self.uid)
-        target_str = self.f_target.value.strip().lstrip("<@!>").rstrip(">")
+        target_str = re.sub(r"[<@!>]", "", self.f_target.value.strip())
         if not target_str.isdigit():
             await ix.response.send_message("Invalid user ID.", ephemeral=True); return
         target_id = int(target_str)
@@ -238,7 +239,7 @@ class _EcoGrantModal(discord.ui.Modal):
     async def on_submit(self, ix: discord.Interaction):
         gid = self.gid
         cfg = load_config(gid)
-        target_str = self.f_target.value.strip().lstrip("<@!>").rstrip(">")
+        target_str = re.sub(r"[<@!>]", "", self.f_target.value.strip())
         if not target_str.isdigit():
             await ix.response.send_message("Invalid user ID.", ephemeral=True); return
         target_id = int(target_str)
@@ -303,7 +304,7 @@ class _EcoCheckModal(discord.ui.Modal, title="Check Player Balance"):
     async def on_submit(self, ix: discord.Interaction):
         gid = self.gid
         cfg = load_config(gid)
-        target_str = self.f_target.value.strip().lstrip("<@!>").rstrip(">")
+        target_str = re.sub(r"[<@!>]", "", self.f_target.value.strip())
         if not target_str.isdigit():
             await ix.response.send_message("Invalid user ID.", ephemeral=True); return
         target_id = int(target_str)

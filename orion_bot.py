@@ -6768,7 +6768,7 @@ def _build_leaderboard_embed(guild: discord.Guild, viewer_uid: str, show_hidden:
         if p.get("lb_hidden") and not show_hidden:
             hidden_ids.add(uid)
             continue
-        entries.append((uid, p.get("wallet", 0), p.get("char_name", "") or "?"))
+        entries.append((uid, int(p.get("wallet", 0)), p.get("char_name", "") or "?"))
     entries.sort(key=lambda x: x[1], reverse=True)
 
     embed = discord.Embed(
@@ -6909,10 +6909,12 @@ class _GimmickUseView(discord.ui.View):
     async def btn_use(self, ix: discord.Interaction, _b):
         if str(ix.user.id) != self.uid:
             await ix.response.send_message("Not your item.", ephemeral=True); return
-        # Remove 1 from inventory
         import orion_items as _oi
+        try:
+            result = _apply_gimmick_effect(self.uid, self.item_data, self.guild)
+        except Exception as e:
+            await ix.response.send_message(f"Failed to apply item effect: {e}", ephemeral=True); return
         _oi.remove_player_item(self.uid, self.item_key, 1)
-        result = _apply_gimmick_effect(self.uid, self.item_data, self.guild)
         embed = discord.Embed(
             title=f"✨ Used: {self.item_data.get('name','?')}",
             description=result,

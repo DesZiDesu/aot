@@ -544,12 +544,17 @@ class TrainingAttrView(discord.ui.View):
 
             # apply XP
             if success:
-                xp_gain = random.randint(cfg.get("exp_gain_min", 20), cfg.get("exp_gain_max", 50))
+                xp_min = cfg.get("exp_gain_min", 20)
+                xp_max = cfg.get("exp_gain_max", 50)
+                if xp_min > xp_max:
+                    xp_min, xp_max = xp_max, xp_min
+                xp_gain = random.randint(xp_min, xp_max)
                 result_color = 0x2ecc71
                 result_title = "✅ ฝึกสำเร็จ!"
             else:
-                half_min = max(1, cfg.get("exp_gain_min", 20) // 4)
-                half_max = max(2, cfg.get("exp_gain_min", 20) // 2)
+                xp_max = cfg.get("exp_gain_max", 50)
+                half_min = max(1, xp_max // 4)
+                half_max = max(2, xp_max // 2)
                 xp_gain = random.randint(half_min, half_max)
                 result_color = 0xe74c3c
                 result_title = "❌ ล้มเหลว — ได้ XP เล็กน้อย"
@@ -894,6 +899,12 @@ class _BoostRemoveModal(discord.ui.Modal, title="🗑️ ลบ EXP Boost"):
 class _BoostEXPView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
+
+    async def interaction_check(self, ix: discord.Interaction) -> bool:
+        if not ix.user.guild_permissions.administrator:
+            await ix.response.send_message("❌ ต้องเป็นแอดมิน", ephemeral=True)
+            return False
+        return True
 
     @discord.ui.button(label="📋 ดู Boosts ทั้งหมด", style=discord.ButtonStyle.primary, row=0)
     async def btn_list(self, ix: discord.Interaction, _b):

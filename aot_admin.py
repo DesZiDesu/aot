@@ -530,6 +530,10 @@ class RevokeBlView(discord.ui.View):
         await ix.response.edit_message(view=self)
 
     async def _do(self, ix):
+        if not self.sel_bl or self.sel_bl == "__none__":
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
+        if not self.sel_users:
+            await ix.response.send_message(t(self.gid, "select_value_first"), ephemeral=True); return
         cfg = load_config(self.gid); acc = cfg.get("special_access", {})
         for uid in self.sel_users:
             lst = acc.get(uid, [])
@@ -618,12 +622,11 @@ class GrantShifterView(discord.ui.View):
                 await cv2_dm(user, t(self.gid, "got_titan_dm", titan=self.sel_titan))
             except Exception:
                 pass
+        self._build()
+        await ix.response.edit_message(embed=_grant_sh_embed(self.gid), view=self)
         if skipped:
             skip_msg = f"Granted to {len(self.sel_users) - len(skipped)} player(s). Skipped {len(skipped)} due to immune bloodline."
-            await ix.response.send_message(skip_msg, ephemeral=True)
-        else:
-            self._build()
-            await ix.response.edit_message(embed=_grant_sh_embed(self.gid), view=self)
+            await ix.followup.send(skip_msg, ephemeral=True)
 
     async def _revoke(self, ix):
         embed = discord.Embed(title="Revoke Shifter Access", description="Select users to revoke:", color=0xe74c3c)
@@ -804,7 +807,13 @@ class _MindlessToHumanView(discord.ui.View):
         cfg = load_config(self.gid)
         member = ix.guild.get_member(target_id)
         if member:
-            try: await assign_roles(member, player, cfg)
+            try:
+                mindless_role_id = cfg.get("mindless_role_id")
+                if mindless_role_id:
+                    mindless_role = ix.guild.get_role(int(mindless_role_id))
+                    if mindless_role and mindless_role in member.roles:
+                        await member.remove_roles(mindless_role)
+                await assign_roles(member, player, cfg)
             except Exception: pass
         await log_event(bot, self.gid, "admin",
                         f"<@{ix.user.id}> converted <@{target_id}> from mindless to human")
@@ -869,14 +878,14 @@ class _ConfirmDeathView(discord.ui.View):
     async def btn_confirm(self, ix: discord.Interaction, _b):
         players = load_players(self.gid)
         uid_str = str(self.target_id)
+        old_player = players.get(uid_str, {})
         if uid_str in players:
             del players[uid_str]
             save_players(self.gid, players)
         cfg = load_config(self.gid)
         member = ix.guild.get_member(self.target_id)
-        if member:
+        if member and old_player:
             try:
-                old_player = {"faction": "", "rank": "", "bloodline": "", "shifter": "None"}
                 await remove_old_roles(member, old_player, cfg)
             except Exception: pass
         await log_event(bot, self.gid, "admin",
@@ -906,15 +915,16 @@ class _ConfirmDeathView(discord.ui.View):
 
 
 class _SetCreationRoleModal(discord.ui.Modal, title="Set Required Creation Role"):
-    f_role_id = discord.ui.TextInput(label="Role ID (leave blank to remove)", max_length=30, required=False)
-
     def __init__(self, gid: int, parent):
         super().__init__()
         self.gid = gid; self.parent = parent
         cfg = load_config(gid)
         existing = cfg.get("required_creation_role_id", "")
-        if existing:
-            self.f_role_id.default = str(existing)
+        self.f_role_id = discord.ui.TextInput(
+            label="Role ID (leave blank to remove)", max_length=30, required=False,
+            default=str(existing) if existing else "",
+        )
+        self.add_item(self.f_role_id)
 
     async def on_submit(self, ix: discord.Interaction):
         cfg = load_config(self.gid)
@@ -935,15 +945,16 @@ class _SetCreationRoleModal(discord.ui.Modal, title="Set Required Creation Role"
 
 
 class _SetReviewChannelModal(discord.ui.Modal, title="Set Character Review Channel"):
-    f_channel_id = discord.ui.TextInput(label="Channel ID (forum or text)", max_length=30)
-
     def __init__(self, gid: int, parent):
         super().__init__()
         self.gid = gid; self.parent = parent
         cfg = load_config(gid)
         existing = cfg.get("char_review_channel_id", "")
-        if existing:
-            self.f_channel_id.default = str(existing)
+        self.f_channel_id = discord.ui.TextInput(
+            label="Channel ID (forum or text)", max_length=30,
+            default=str(existing) if existing else "",
+        )
+        self.add_item(self.f_channel_id)
 
     async def on_submit(self, ix: discord.Interaction):
         cfg = load_config(self.gid)
