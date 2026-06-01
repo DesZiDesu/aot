@@ -64,7 +64,15 @@ def _safe_emoji(s, default="📦"):
     return s
 
 
-ITEMS_FILE = f"{ORION_DATA_DIR}/items.json"
+ITEMS_FILE        = f"{ORION_DATA_DIR}/items.json"
+ITEMS_CONFIG_FILE = f"{ORION_DATA_DIR}/items_config.json"
+
+_search_cooldowns: dict = {}  # uid -> last search timestamp
+
+
+def _get_search_cooldown() -> int:
+    cfg = load_json(ITEMS_CONFIG_FILE, {})
+    return max(0, int(cfg.get("search_cooldown_seconds", 0)))
 
 # ── ไอเทมเริ่มต้น 4 อย่าง — หิน / ไม้ / เหล็กดิบ / สมุนไพร ──
 DEFAULT_ITEMS = {
@@ -1278,6 +1286,19 @@ async def cmd_items_upload(interaction: discord.Interaction, file: discord.Attac
 async def cmd_items_catalog(interaction: discord.Interaction):
     if not interaction.guild or interaction.guild.id not in ALLOWED_COMMAND_GUILD_IDS:
         await interaction.response.send_message("❌ ใช้ได้เฉพาะในเซิร์ฟ Orion", ephemeral=True); return
+    uid = str(interaction.user.id)
+    cooldown = _get_search_cooldown()
+    if cooldown > 0:
+        now = time.time()
+        last = _search_cooldowns.get(uid, 0)
+        remaining = cooldown - (now - last)
+        if remaining > 0:
+            mins, secs = divmod(int(remaining), 60)
+            cd_str = f"{mins}m {secs}s" if mins else f"{secs}s"
+            await interaction.response.send_message(
+                f"⏳ รอ **{cd_str}** ก่อนค้นหาอีกครั้ง", ephemeral=True
+            ); return
+        _search_cooldowns[uid] = now
     await interaction.response.send_message(
         embed=_items_overview_embed(),
         view=ItemCatalogView(),
