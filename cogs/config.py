@@ -632,19 +632,26 @@ class ConfigMainView(discord.ui.View):
     def _p5_char_creation(self) -> discord.Embed:
         gid = self.gid
         cfg = load_config(gid)
-        role_id   = cfg.get("character_creation_role")
-        role_disp = f"<@&{role_id}>" if role_id else "*Anyone can create a character*"
+        role_id    = cfg.get("character_creation_role")
+        role_disp  = f"<@&{role_id}>" if role_id else "*Anyone can create a character*"
+        forum_id   = cfg.get("character_forum_id")
+        forum_disp = f"<#{forum_id}>" if forum_id else "*Not configured (uses direct modal)*"
+        review_id  = cfg.get("admin_review_channel_id")
+        review_disp = f"<#{review_id}>" if review_id else "*Not set*"
 
         embed = discord.Embed(
             title=self._page_title("🎭 Character Creation"),
             color=EMBED_COLOR,
         )
-        embed.add_field(name="Required Role", value=role_disp, inline=False)
-        embed.set_footer(text="If a role is set, only members with that role may create a character.")
+        embed.add_field(name="Required Role",        value=role_disp,    inline=False)
+        embed.add_field(name="Character Forum",      value=forum_disp,   inline=False)
+        embed.add_field(name="Admin Review Channel", value=review_disp,  inline=False)
+        embed.set_footer(text="When a forum is set, character creation goes through admin review.")
 
         role_sel = discord.ui.RoleSelect(
             placeholder="Set Character Creation Required Role",
             custom_id="cfg_cc_role",
+            row=0,
         )
         role_sel.callback = self._set_cc_role
         self.add_item(role_sel)
@@ -653,9 +660,28 @@ class ConfigMainView(discord.ui.View):
             label="Clear Required Role",
             style=discord.ButtonStyle.danger,
             custom_id="cfg_cc_clear",
+            row=1,
         )
         clear_btn.callback = self._clear_cc_role
         self.add_item(clear_btn)
+
+        forum_sel = discord.ui.ChannelSelect(
+            placeholder="Set Character Forum Channel",
+            custom_id="cfg_cc_forum",
+            channel_types=[discord.ChannelType.forum],
+            row=2,
+        )
+        forum_sel.callback = self._set_forum
+        self.add_item(forum_sel)
+
+        review_sel = discord.ui.ChannelSelect(
+            placeholder="Set Admin Review Channel",
+            custom_id="cfg_cc_review",
+            channel_types=[discord.ChannelType.text],
+            row=3,
+        )
+        review_sel.callback = self._set_review_ch
+        self.add_item(review_sel)
 
         return embed
 
@@ -670,6 +696,22 @@ class ConfigMainView(discord.ui.View):
     async def _clear_cc_role(self, ix: discord.Interaction):
         cfg = load_config(self.gid)
         cfg["character_creation_role"] = None
+        save_config(self.gid, cfg)
+        embed, view = self._build()
+        await ix.response.edit_message(embed=embed, view=view)
+
+    async def _set_forum(self, ix: discord.Interaction):
+        cfg = load_config(self.gid)
+        vals = ix.data.get("values", [])
+        cfg["character_forum_id"] = str(vals[0]) if vals else None
+        save_config(self.gid, cfg)
+        embed, view = self._build()
+        await ix.response.edit_message(embed=embed, view=view)
+
+    async def _set_review_ch(self, ix: discord.Interaction):
+        cfg = load_config(self.gid)
+        vals = ix.data.get("values", [])
+        cfg["admin_review_channel_id"] = str(vals[0]) if vals else None
         save_config(self.gid, cfg)
         embed, view = self._build()
         await ix.response.edit_message(embed=embed, view=view)
