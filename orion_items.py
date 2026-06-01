@@ -202,36 +202,91 @@ def _build_item_embed(iid: str, item: dict) -> discord.Embed:
     return embed
 
 
-def _items_overview_embed() -> discord.Embed:
+def _build_catalog_pages() -> list:
+    """Returns list of pages; each page is a list of (cat_type, iid, item_dict) tuples.
+    Groups by category order: resource -> usable -> craft. Page size = 9 items per page."""
     cat = load_items_catalog()
-    resources = [(i, it) for i, it in cat.items() if it.get("type") not in ("craft", "usable")]
-    usables   = [(i, it) for i, it in cat.items() if it.get("type") == "usable"]
-    crafts    = [(i, it) for i, it in cat.items() if it.get("type") == "craft"]
+    resources = [(iid, it) for iid, it in cat.items() if it.get("type") not in ("craft", "usable")]
+    usables   = [(iid, it) for iid, it in cat.items() if it.get("type") == "usable"]
+    crafts    = [(iid, it) for iid, it in cat.items() if it.get("type") == "craft"]
+
+    ordered: list = []
+    for type_key, group in (("resource", resources), ("usable", usables), ("craft", crafts)):
+        for iid, it in group:
+            ordered.append((type_key, iid, it))
+
+    page_size = 9
+    pages: list = []
+    for i in range(0, max(1, len(ordered)), page_size):
+        pages.append(ordered[i : i + page_size])
+    return pages
+
+
+def _items_catalog_embed(page_idx: int = 0) -> discord.Embed:
+    """Build the paginated catalog embed for page_idx."""
+    pages = _build_catalog_pages()
+    cat = load_items_catalog()
+    total_items = len(cat)
+    total_pages = len(pages)
+
+    if not cat:
+        embed = discord.Embed(
+            title="📦 คลังไอเทม",
+            description="_ยังไม่มีไอเทม_",
+            color=0x3498db,
+        )
+        embed.set_footer(text="หน้า 1/1 · ◀▶ เลื่อนหน้า · dropdown ดูรายละเอียด")
+        return embed
+
+    page_idx = max(0, min(page_idx, total_pages - 1))
+    page_items = pages[page_idx]
+
     embed = discord.Embed(
-        title="คลังไอเทม",
-        description=f"_ไอเทมทั้งหมด **{len(cat)}** รายการ_",
+        title=f"📦 คลังไอเทม · หน้า {page_idx + 1}/{total_pages}",
+        description=f"_ไอเทมทั้งหมด **{total_items}** รายการ_",
         color=0x3498db,
     )
-    if resources:
+
+    _CAT_HEADERS = {
+        "resource": "── 🌿 ทรัพยากร ──",
+        "usable":   "── ✨ กดใช้ได้ ──",
+        "craft":    "── 🛠️ คราฟ ──",
+    }
+
+    # Group consecutive items by category
+    from itertools import groupby
+    for cat_type, group_iter in groupby(page_items, key=lambda x: x[0]):
+        group = list(group_iter)
+        # Category header (non-inline)
         embed.add_field(
-            name=f"ทรัพยากร — {len(resources)}",
-            value="\n".join(f"{it.get('emoji','📦')} **{it.get('name','?')}** · {money_str(it.get('sell_price',0))}" for _, it in resources[:12]) or "_ไม่มี_",
+            name=_CAT_HEADERS.get(cat_type, cat_type),
+            value="​",
             inline=False,
         )
-    if usables:
-        embed.add_field(
-            name=f"กดใช้ได้ — {len(usables)}",
-            value="\n".join(f"{it.get('emoji','📦')} **{it.get('name','?')}** · {money_str(it.get('sell_price',0))}" for _, it in usables[:12]) or "_ไม่มี_",
-            inline=False,
-        )
-    if crafts:
-        embed.add_field(
-            name=f"คราฟ — {len(crafts)}",
-            value="\n".join(f"{it.get('emoji','📦')} **{it.get('name','?')}** · {money_str(it.get('sell_price',0))}" for _, it in crafts[:12]) or "_ไม่มี_",
-            inline=False,
-        )
-    embed.set_footer(text="/ไอเทม กระเป๋าตัวเอง · /คราฟ คราฟไอเทม")
+        # Inline item fields
+        for _, iid, item in group:
+            emoji = item.get("emoji", "📦")
+            name  = item.get("name", "?")
+            price = money_str(item.get("sell_price", 0))
+            embed.add_field(
+                name=f"{emoji} {name}",
+                value=f"💰 {price}",
+                inline=True,
+            )
+        # Pad to nearest multiple of 3
+        remainder = len(group) % 3
+        if remainder != 0:
+            pad_count = 3 - remainder
+            for _ in range(pad_count):
+                embed.add_field(name="​", value="​", inline=True)
+
+    embed.set_footer(text=f"หน้า {page_idx + 1}/{total_pages} · ◀▶ เลื่อนหน้า · dropdown ดูรายละเอียด")
     return embed
+
+
+def _items_overview_embed() -> discord.Embed:
+    """Kept for backward compatibility — delegates to the new paginated embed."""
+    return _items_catalog_embed(0)
 
 
 def _player_bag_embed(uid: str, author) -> discord.Embed:
@@ -262,6 +317,7 @@ def _player_bag_embed(uid: str, author) -> discord.Embed:
 
 # ── Views & Selects ──────────────────────────────────────────
 class ItemCatalogSelect(discord.ui.Select):
+    """Kept for backward compatibility with admin views that reference it."""
     def __init__(self, page: int = 0):
         self.page = page
         cat = load_items_catalog()
@@ -312,10 +368,126 @@ class ItemCatalogSelect(discord.ui.Select):
         await interaction.response.send_message(embed=_build_item_embed(iid, item), ephemeral=True)
 
 
+class _ItemDetailDropdown(discord.ui.Select):
+    """Dropdown for selecting any item to view its full detail embed.
+    Shows items paginated (page 0 by default). Selecting __nextpage__ flips the dropdown page."""
+    def __init__(self, page: int = 0):
+        self.page = page
+        cat = load_items_catalog()
+        items = sorted(cat.items(), key=lambda x: x[1].get("name", x[0]).lower())
+        total = len(items)
+        page_size = 23
+        max_page = max(0, (total - 1) // page_size)
+        start = page * page_size
+        end = start + page_size
+        page_items = items[start:end]
+
+        options = []
+        for iid, it in page_items:
+            options.append(discord.SelectOption(
+                label=it.get("name", "?")[:100],
+                value=iid,
+                description=(it.get("description", "")[:80] or "—"),
+                emoji=_safe_emoji(it.get("emoji")),
+            ))
+        if page < max_page:
+            options.append(discord.SelectOption(
+                label="→ หน้าถัดไป",
+                value=f"__nextpage__:{page+1}",
+                description=f"ดูหน้า {page+2}/{max_page+1}",
+            ))
+        if page > 0:
+            options.append(discord.SelectOption(
+                label="← หน้าก่อน",
+                value=f"__nextpage__:{page-1}",
+                description=f"กลับหน้า {page}/{max_page+1}",
+            ))
+        if not options:
+            options = [discord.SelectOption(label="ยังไม่มีไอเทม", value="none")]
+        ph_suffix = f" (หน้า {page+1}/{max_page+1})" if max_page > 0 else ""
+        super().__init__(
+            placeholder=f"🔍 ดูรายละเอียดไอเทม{ph_suffix}...",
+            options=options[:25],
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "none":
+            return
+        if self.values[0].startswith("__nextpage__:"):
+            new_page = int(self.values[0].split(":", 1)[1])
+            # Replace this dropdown in the view with the new page
+            view = self.view
+            if view is None:
+                await interaction.response.defer()
+                return
+            new_dropdown = _ItemDetailDropdown(page=new_page)
+            for child in list(view.children):
+                if child is self:
+                    view.remove_item(child)
+                    view.add_item(new_dropdown)
+                    break
+            await interaction.response.edit_message(view=view)
+            return
+        iid = self.values[0]
+        item = get_item(iid)
+        if not item:
+            await interaction.response.send_message("❌ ไม่พบไอเทม", ephemeral=True)
+            return
+        await interaction.response.send_message(embed=_build_item_embed(iid, item), ephemeral=True)
+
+
 class ItemCatalogView(discord.ui.View):
+    """Paginated catalog view with ◀/▶ navigation buttons and an item detail dropdown."""
     def __init__(self, page: int = 0):
         super().__init__(timeout=300)
-        self.add_item(ItemCatalogSelect(page=page))
+        self._page = page
+        pages = _build_catalog_pages()
+        total_pages = len(pages)
+
+        # ── Row 0: ◀  |  หน้า X/Y  |  ▶ ──
+        prev_btn = discord.ui.Button(
+            label="◀",
+            style=discord.ButtonStyle.secondary,
+            disabled=(page <= 0),
+            row=0,
+        )
+        indicator_btn = discord.ui.Button(
+            label=f"หน้า {page + 1}/{total_pages}",
+            style=discord.ButtonStyle.secondary,
+            disabled=True,
+            row=0,
+        )
+        next_btn = discord.ui.Button(
+            label="▶",
+            style=discord.ButtonStyle.secondary,
+            disabled=(page >= total_pages - 1),
+            row=0,
+        )
+
+        async def _prev_callback(interaction: discord.Interaction):
+            new_page = max(0, self._page - 1)
+            await interaction.response.edit_message(
+                embed=_items_catalog_embed(new_page),
+                view=ItemCatalogView(new_page),
+            )
+
+        async def _next_callback(interaction: discord.Interaction):
+            new_page = min(total_pages - 1, self._page + 1)
+            await interaction.response.edit_message(
+                embed=_items_catalog_embed(new_page),
+                view=ItemCatalogView(new_page),
+            )
+
+        prev_btn.callback = _prev_callback
+        next_btn.callback = _next_callback
+
+        self.add_item(prev_btn)
+        self.add_item(indicator_btn)
+        self.add_item(next_btn)
+
+        # ── Row 1: detail dropdown ──
+        self.add_item(_ItemDetailDropdown(page=0))
 
 
 # ── PlayerBag (กระเป๋ามีปุ่ม ใช้/โอน/ทิ้ง/ขาย) ───────────────
@@ -1300,8 +1472,8 @@ async def cmd_items_catalog(interaction: discord.Interaction):
             ); return
         _search_cooldowns[uid] = now
     await interaction.response.send_message(
-        embed=_items_overview_embed(),
-        view=ItemCatalogView(),
+        embed=_items_catalog_embed(0),
+        view=ItemCatalogView(0),
         ephemeral=_eph("คลังไอเทม"),
     )
 

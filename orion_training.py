@@ -12,6 +12,8 @@ import sys
 import time
 import random as _rand
 import asyncio
+import io as _io
+import json as _json
 import discord
 
 # ── ดึง dependencies จาก orion_bot ────────────────────────────
@@ -462,6 +464,46 @@ class TrainingAdminView(discord.ui.View):
         view.add_item(CategorySelectAdmin("เลือกหมวดที่จะตั้ง CD...", action="cooldown"))
         await ix.response.send_message("เลือกหมวด ↓", view=view, ephemeral=True)
 
+    @discord.ui.button(label="⬇️ ดาวน์โหลด JSON", style=discord.ButtonStyle.secondary, row=3)
+    async def btn_download(self, ix: discord.Interaction, _b):
+        pools = load_pools()
+        data_bytes = _json.dumps(pools, ensure_ascii=False, indent=2).encode("utf-8")
+        file = discord.File(_io.BytesIO(data_bytes), filename="training_pools.json")
+        await ix.response.send_message(
+            "📥 ไฟล์ Training Pools ปัจจุบัน — แก้แล้วใช้ `/ฝึกอัปโหลด` อัปกลับ\n"
+            '_schema:_ `{ "<cat_id>": {name, emoji, icon_url, description, minigame, fail_cooldown_sec, hidden, vip_user_ids, skills:[{name,context,emoji,icon_url,origin_type,chance}]} }`',
+            file=file,
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="📋 Template JSON", style=discord.ButtonStyle.secondary, row=3)
+    async def btn_template(self, ix: discord.Interaction, _b):
+        template = {
+            "example_category": {
+                "name": "ชื่อหมวด",
+                "emoji": "✨",
+                "icon_url": "",
+                "description": "คำอธิบายหมวด",
+                "minigame": "guess_number",
+                "fail_cooldown_sec": 0,
+                "hidden": False,
+                "vip_user_ids": [],
+                "skills": [
+                    {
+                        "name": "ชื่อสกิล",
+                        "context": "คำอธิบายสกิล",
+                        "emoji": "⚔️",
+                        "icon_url": "",
+                        "origin_type": "ชื่อหมวด",
+                        "chance": 100,
+                    }
+                ],
+            }
+        }
+        data_bytes = _json.dumps(template, ensure_ascii=False, indent=2).encode("utf-8")
+        file = discord.File(_io.BytesIO(data_bytes), filename="training_template.json")
+        await ix.response.send_message(file=file, ephemeral=True)
+
 
 class TrainingVipUserSelect(discord.ui.UserSelect):
     def __init__(self, cid: str):
@@ -535,3 +577,36 @@ async def cmd_training_admin(interaction: discord.Interaction):
         color=0xfdcb6e,
     )
     await interaction.response.send_message(embed=embed, view=TrainingAdminView(), ephemeral=True)
+
+
+@bot.tree.command(name="ฝึกอัปโหลด", description="[Admin] อัปโหลด training_pools.json (merge หรือ replace)", guild=_ORION_GUILD_OBJ)
+@discord.app_commands.describe(
+    file="ไฟล์ training_pools.json",
+    mode="merge = รวมกับของเดิม (default) / replace = ทับทั้งหมด"
+)
+async def cmd_training_upload(interaction: discord.Interaction, file: discord.Attachment, mode: str = "merge"):
+    if not interaction.guild or interaction.guild.id not in ALLOWED_COMMAND_GUILD_IDS:
+        await interaction.response.send_message("❌ ใช้ได้เฉพาะในเซิร์ฟ Orion", ephemeral=True); return
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ ต้องเป็นแอดมิน", ephemeral=True); return
+    if not file.filename.endswith(".json"):
+        await interaction.response.send_message("❌ ไฟล์ต้องเป็น .json", ephemeral=True); return
+    await interaction.response.defer(ephemeral=True)
+    try:
+        raw = await file.read()
+        uploaded = _json.loads(raw.decode("utf-8"))
+    except Exception as e:
+        await interaction.followup.send(f"❌ อ่านไฟล์ไม่ได้: {e}", ephemeral=True); return
+    if not isinstance(uploaded, dict) or not all(isinstance(v, dict) for v in uploaded.values()):
+        await interaction.followup.send(
+            "❌ schema ไม่ถูกต้อง — ต้องเป็น `{ \"<cat_id>\": { ... }, ... }`",
+            ephemeral=True,
+        ); return
+    if mode == "replace":
+        new_data = uploaded
+    else:
+        new_data = load_pools()
+        new_data.update(uploaded)
+    save_pools(new_data)
+    n = len(new_data)
+    await interaction.followup.send(f"✅ {mode} แล้ว — รวม {n} หมวดหมู่", ephemeral=True)
