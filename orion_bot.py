@@ -1802,11 +1802,12 @@ class SkillEditRequestModal(discord.ui.Modal, title="ขอแก้สกิล
 
 # ── Skill categories (admin-managed) ─────────────────────────
 SKILL_CATEGORIES_FILE = f"{ORION_DATA_DIR}/skill_categories.json"
+CHAR_PENDING_FILE     = f"{ORION_DATA_DIR}/char_pending.json"
 
 DEFAULT_SKILL_CATEGORIES = [
-    {"id": "false_magic", "name": "False Magic", "emoji": "🔮", "icon_url": "", "description": "เวทมนตร์ลวง"},
-    {"id": "artifact",    "name": "Artifact",    "emoji": "⚙️", "icon_url": "", "description": "พลังจากสิ่งประดิษฐ์"},
-    {"id": "aura",        "name": "Aura",        "emoji": "🌟", "icon_url": "", "description": "พลังในตัวเอง"},
+    {"id": "false_magic", "name": "False Magic", "emoji": "🔮", "icon_url": "", "description": "เวทมนตร์ลวง",          "transferable": False},
+    {"id": "artifact",    "name": "Artifact",    "emoji": "⚙️", "icon_url": "", "description": "พลังจากสิ่งประดิษฐ์", "transferable": True},
+    {"id": "aura",        "name": "Aura",        "emoji": "🌟", "icon_url": "", "description": "พลังในตัวเอง",          "transferable": False},
 ]
 
 
@@ -1924,13 +1925,9 @@ class OrionProfileView(discord.ui.View):
     def __init__(self, uid: str, author):
         super().__init__(timeout=None)
         self.uid = uid; self.author = author
-        # Row 0: Done
         self.add_item(DoneBtn(row=0))
-        # Row 1: คลังสกิล
-        # Row 2: แก้ไขข้อมูลตัวละคร
-        # Row 3: สร้างสกิลใหม่ (ถ้ามี grant)
         if total_skill_grants(uid) > 0:
-            self.add_item(CreateSkillBtn(uid, author))   # row=3 ใน CreateSkillBtn
+            self.add_item(CreateSkillBtn(uid, author))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if str(interaction.user.id) != self.uid:
@@ -1943,6 +1940,19 @@ class OrionProfileView(discord.ui.View):
             embed=_orion_skill_list_embed(self.uid),
             view=OrionSkillBagView(self.uid, self.author),
         )
+
+    @discord.ui.button(label="📊 Stats", style=discord.ButtonStyle.primary, row=1)
+    async def btn_stats(self, interaction, button):
+        try:
+            import orion_stats
+            p = load_orion_players().get(self.uid, {})
+            char_name = p.get("char_name") or self.author.display_name
+            await interaction.response.edit_message(
+                embed=orion_stats.stats_embed(self.uid, char_name),
+                view=_StatsBackView(self.uid, self.author),
+            )
+        except Exception as e:
+            await interaction.response.send_message(f"❌ ระบบ Stats ยังไม่พร้อม: {e}", ephemeral=True)
 
     @discord.ui.button(label="Edit Character", style=discord.ButtonStyle.primary, row=2)
     async def btn_edit(self, interaction, button):
@@ -1957,6 +1967,383 @@ class OrionProfileView(discord.ui.View):
             color=0x6c5ce7,
         )
         await interaction.response.edit_message(embed=embed, view=OrionEditView(self.uid, self.author))
+
+    @discord.ui.button(label="🗑️ ลบตัวละคร", style=discord.ButtonStyle.danger, row=3)
+    async def btn_delete(self, interaction, button):
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="⚠️ ยืนยันการลบตัวละคร",
+                description=(
+                    "การลบตัวละครจะ**ลบข้อมูลทั้งหมด**รวมถึง:\n"
+                    "• ข้อมูลตัวละคร, สกิล, ไอเทม\n"
+                    "• ออกจาก Guild และ Familia\n"
+                    "• ไม่สามารถกู้คืนได้\n\n"
+                    "**คุณแน่ใจหรือไม่?**"
+                ),
+                color=discord.Color.red(),
+            ),
+            view=_DeleteCharConfirmView(self.uid, self.author),
+        )
+
+
+class _StatsBackView(discord.ui.View):
+    """Simple back button shown on stats page"""
+    def __init__(self, uid: str, author):
+        super().__init__(timeout=None)
+        self.uid = uid; self.author = author
+
+    async def interaction_check(self, ix):
+        if str(ix.user.id) != self.uid:
+            await ix.response.send_message("❌ ไม่ใช่เมนูของคุณ", ephemeral=True); return False
+        return True
+
+    @discord.ui.button(label="◀ กลับ", style=discord.ButtonStyle.secondary, row=0)
+    async def btn_back(self, ix, _b):
+        await ix.response.edit_message(
+            embed=_orion_profile_embed(self.uid, self.author),
+            view=OrionProfileView(self.uid, self.author),
+        )
+
+    @discord.ui.button(label="⚡ ฝึกสถิติ", style=discord.ButtonStyle.primary, row=0)
+    async def btn_train(self, ix, _b):
+        try:
+            import orion_stats
+            await orion_stats._start_training(ix, self.uid)
+        except Exception as e:
+            await ix.response.send_message(f"❌ {e}", ephemeral=True)
+
+
+class _DeleteCharConfirmView(discord.ui.View):
+    def __init__(self, uid: str, author):
+        super().__init__(timeout=60)
+        self.uid = uid; self.author = author
+
+    async def interaction_check(self, ix):
+        if str(ix.user.id) != self.uid:
+            await ix.response.send_message("❌ ไม่ใช่เมนูของคุณ", ephemeral=True); return False
+        return True
+
+    @discord.ui.button(label="✅ ยืนยัน ลบตัวละคร", style=discord.ButtonStyle.danger, row=0)
+    async def btn_confirm(self, ix, _b):
+        _delete_player_data(self.uid)
+        await ix.response.edit_message(
+            embed=discord.Embed(
+                description="🗑️ ลบตัวละครเรียบร้อยแล้ว ใช้ `/orion` เพื่อสร้างใหม่",
+                color=discord.Color.orange(),
+            ),
+            view=None,
+        )
+
+    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.secondary, row=0)
+    async def btn_cancel(self, ix, _b):
+        await ix.response.edit_message(
+            embed=_orion_profile_embed(self.uid, self.author),
+            view=OrionProfileView(self.uid, self.author),
+        )
+
+
+# ── Forum-based Character Creation ──────────────────────────
+
+def _load_char_pending() -> dict:
+    return load_json(CHAR_PENDING_FILE, {})
+
+
+def _save_char_pending(d: dict):
+    save_json(CHAR_PENDING_FILE, d)
+
+
+def _char_review_embed(pid: str, d: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"📋 ใบสมัครตัวละคร — {d.get('char_name','?')}",
+        color=0xf39c12,
+    )
+    embed.set_author(name=f"{d.get('username','?')}  (ID: {d.get('uid','?')})")
+    if d.get("image_url"):
+        embed.set_thumbnail(url=d["image_url"])
+    fields = [
+        ("ชื่อตัวละคร", d.get("char_name", "—")),
+        ("เผ่าพันธุ์", d.get("race", "—")),
+        ("เพศ", d.get("gender", "—")),
+        ("ชั้น/อาชีพ", d.get("role", "—")),
+        ("อายุ", d.get("age", "—")),
+        ("รูปลักษณ์", d.get("appearance", "—")[:500]),
+        ("ภาพ URL", d.get("image_url", "—")[:200]),
+        ("ภูมิหลัง", d.get("background", "—")[:500]),
+        ("บุคลิกภาพ", d.get("personality", "—")[:500]),
+        ("แรงจูงใจ", d.get("goal", "—")[:500]),
+        ("จุดเด่น", d.get("strengths", "—")[:400]),
+        ("จุดด้อย", d.get("weaknesses", "—")[:400]),
+    ]
+    for name, val in fields:
+        embed.add_field(name=name, value=val or "—", inline=False)
+    embed.set_footer(text=f"ID: {pid} · {d.get('submitted_at', '?')}")
+    return embed
+
+
+async def _post_char_review(guild, pid: str, d: dict):
+    cfg = load_json(f"{ORION_DATA_DIR}/creation_config.json", {})
+    ch_id = cfg.get("review_channel_id") or cfg.get("char_review_channel_id")
+    if not ch_id:
+        return
+    ch = guild.get_channel(int(ch_id))
+    if ch is None:
+        return
+    msg = await ch.send(embed=_char_review_embed(pid, d), view=_CharReviewView(pid, d["uid"]))
+    pending = _load_char_pending()
+    if pid in pending:
+        pending[pid]["review_message_id"] = msg.id
+        _save_char_pending(pending)
+
+
+class _CharReviewView(discord.ui.View):
+    def __init__(self, pid: str, applicant_uid: str):
+        super().__init__(timeout=None)
+        self.pid = pid
+        self.applicant_uid = applicant_uid
+
+    async def interaction_check(self, ix: discord.Interaction) -> bool:
+        if not ix.user.guild_permissions.administrator:
+            await ix.response.send_message("❌ ต้องเป็นแอดมิน", ephemeral=True); return False
+        return True
+
+    @discord.ui.button(label="✅ อนุมัติ", style=discord.ButtonStyle.success, row=0)
+    async def btn_approve(self, ix: discord.Interaction, _b):
+        pending = _load_char_pending()
+        d = pending.get(self.pid)
+        if not d:
+            await ix.response.send_message("❌ ไม่พบใบสมัครนี้แล้ว (อาจถูกดำเนินการแล้ว)", ephemeral=True); return
+        uid = d["uid"]
+        ensure_orion_player(uid)
+        data = load_orion_players()
+        data[uid].update({
+            "char_name":   d.get("char_name", ""),
+            "race":        d.get("race", ""),
+            "gender":      d.get("gender", ""),
+            "role":        d.get("role", ""),
+            "appearance":  d.get("appearance", ""),
+            "image_url":   d.get("image_url", ""),
+        })
+        data[uid]["background"]   = d.get("background", "")
+        data[uid]["personality"]  = d.get("personality", "")
+        data[uid]["goal"]         = d.get("goal", "")
+        data[uid]["strengths"]    = d.get("strengths", "")
+        data[uid]["weaknesses"]   = d.get("weaknesses", "")
+        save_orion_players(data)
+        # assign auto_assign_role if configured
+        cfg = load_json(f"{ORION_DATA_DIR}/creation_config.json", {})
+        role_id = cfg.get("auto_assign_role_id")
+        if role_id and ix.guild:
+            member = ix.guild.get_member(int(uid))
+            if member:
+                role = ix.guild.get_role(int(role_id))
+                if role:
+                    try: await member.add_roles(role)
+                    except Exception: pass
+        # mark pending as done
+        pending[self.pid]["status"] = "approved"
+        _save_char_pending(pending)
+        embed = _char_review_embed(self.pid, d)
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ อนุมัติ by {ix.user.display_name}")
+        await ix.response.edit_message(embed=embed, view=None)
+        # DM applicant
+        try:
+            user = await bot.fetch_user(int(uid))
+            await user.send(
+                embed=discord.Embed(
+                    title="✅ ตัวละครของคุณได้รับการอนุมัติแล้ว!",
+                    description=f"ยินดีด้วย **{d.get('char_name','?')}** ถูกสร้างแล้ว ใช้ `/orion` เพื่อดูโปรไฟล์",
+                    color=discord.Color.green(),
+                )
+            )
+        except Exception:
+            pass
+
+    @discord.ui.button(label="❌ ปฏิเสธ", style=discord.ButtonStyle.danger, row=0)
+    async def btn_decline(self, ix: discord.Interaction, _b):
+        pending = _load_char_pending()
+        if self.pid not in pending:
+            await ix.response.send_message("❌ ไม่พบใบสมัครนี้แล้ว", ephemeral=True); return
+        await ix.response.send_modal(_CharDeclineModal(self.pid, self.applicant_uid, self.view_embed(pending[self.pid])))
+
+    def view_embed(self, d):
+        return _char_review_embed(self.pid, d)
+
+    @discord.ui.button(label="✏️ แก้ไข", style=discord.ButtonStyle.primary, row=0)
+    async def btn_edit(self, ix: discord.Interaction, _b):
+        pending = _load_char_pending()
+        d = pending.get(self.pid, {})
+        await ix.response.send_modal(_CharAdminEditModal(self.pid, d))
+
+
+class _CharDeclineModal(discord.ui.Modal, title="เหตุผลการปฏิเสธ"):
+    f_reason = discord.ui.TextInput(label="เหตุผล", style=discord.TextStyle.paragraph, max_length=500)
+
+    def __init__(self, pid: str, applicant_uid: str, orig_embed):
+        super().__init__()
+        self.pid = pid
+        self.applicant_uid = applicant_uid
+        self.orig_embed = orig_embed
+
+    async def on_submit(self, ix: discord.Interaction):
+        pending = _load_char_pending()
+        if self.pid in pending:
+            pending[self.pid]["status"] = "declined"
+            _save_char_pending(pending)
+        self.orig_embed.color = discord.Color.red()
+        self.orig_embed.set_footer(text=f"❌ ปฏิเสธ by {ix.user.display_name}")
+        await ix.response.edit_message(embed=self.orig_embed, view=None)
+        try:
+            user = await bot.fetch_user(int(self.applicant_uid))
+            await user.send(
+                embed=discord.Embed(
+                    title="❌ ใบสมัครตัวละครถูกปฏิเสธ",
+                    description=f"**เหตุผล:** {self.f_reason.value.strip()}\n\nคุณสามารถแก้ไขและสมัครใหม่ได้โดยใช้ `/orion`",
+                    color=discord.Color.red(),
+                )
+            )
+        except Exception:
+            pass
+
+
+class _CharAdminEditModal(discord.ui.Modal, title="แก้ไขใบสมัคร"):
+    f_name   = discord.ui.TextInput(label="ชื่อตัวละคร", max_length=50)
+    f_race   = discord.ui.TextInput(label="เผ่าพันธุ์", required=False, max_length=50)
+    f_role   = discord.ui.TextInput(label="ชั้น/อาชีพ", required=False, max_length=50)
+    f_appear = discord.ui.TextInput(label="รูปลักษณ์", style=discord.TextStyle.paragraph, required=False, max_length=500)
+    f_bg     = discord.ui.TextInput(label="ภูมิหลัง", style=discord.TextStyle.paragraph, required=False, max_length=500)
+
+    def __init__(self, pid: str, d: dict):
+        super().__init__()
+        self.pid = pid
+        self.f_name.default   = d.get("char_name", "")
+        self.f_race.default   = d.get("race", "")
+        self.f_role.default   = d.get("role", "")
+        self.f_appear.default = d.get("appearance", "")[:500]
+        self.f_bg.default     = d.get("background", "")[:500]
+
+    async def on_submit(self, ix: discord.Interaction):
+        pending = _load_char_pending()
+        if self.pid not in pending:
+            await ix.response.send_message("❌ ไม่พบใบสมัครนี้แล้ว", ephemeral=True); return
+        d = pending[self.pid]
+        if self.f_name.value.strip():   d["char_name"]  = self.f_name.value.strip()
+        if self.f_race.value.strip():   d["race"]       = self.f_race.value.strip()
+        if self.f_role.value.strip():   d["role"]       = self.f_role.value.strip()
+        if self.f_appear.value.strip(): d["appearance"] = self.f_appear.value.strip()
+        if self.f_bg.value.strip():     d["background"] = self.f_bg.value.strip()
+        _save_char_pending(pending)
+        await ix.response.edit_message(embed=_char_review_embed(self.pid, d), view=_CharReviewView(self.pid, d["uid"]))
+
+
+# Character creation modals chained (3 × 4 fields = 12)
+class _CharCreateModal3(discord.ui.Modal, title="สร้างตัวละคร (3/3)"):
+    f_strengths = discord.ui.TextInput(label="จุดเด่น / ความสามารถ", style=discord.TextStyle.paragraph, max_length=400)
+    f_weaknesses = discord.ui.TextInput(label="จุดด้อย / ข้อจำกัด", style=discord.TextStyle.paragraph, max_length=400)
+    f_goal       = discord.ui.TextInput(label="แรงจูงใจ / เป้าหมาย", style=discord.TextStyle.paragraph, max_length=400)
+    f_personality = discord.ui.TextInput(label="บุคลิกภาพ", style=discord.TextStyle.paragraph, max_length=400)
+
+    def __init__(self, prev: dict, applicant):
+        super().__init__()
+        self.prev = prev
+        self.applicant = applicant
+
+    async def on_submit(self, ix: discord.Interaction):
+        import uuid as _uuid
+        import datetime as _dt
+        data = dict(self.prev)
+        data["strengths"]   = self.f_strengths.value.strip()
+        data["weaknesses"]  = self.f_weaknesses.value.strip()
+        data["goal"]        = self.f_goal.value.strip()
+        data["personality"] = self.f_personality.value.strip()
+        pid = str(_uuid.uuid4())[:8]
+        data["uid"]          = str(ix.user.id)
+        data["username"]     = ix.user.display_name
+        data["submitted_at"] = _dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        data["status"]       = "pending"
+        pending = _load_char_pending()
+        pending[pid] = data
+        _save_char_pending(pending)
+        await ix.response.send_message(
+            embed=discord.Embed(
+                title="📬 ส่งใบสมัครแล้ว!",
+                description="ใบสมัครตัวละครของคุณถูกส่งให้แอดมินตรวจสอบแล้ว\nรอการอนุมัติ — คุณจะได้รับ DM เมื่อดำเนินการแล้ว",
+                color=discord.Color.blurple(),
+            ),
+            ephemeral=True,
+        )
+        if ix.guild:
+            await _post_char_review(ix.guild, pid, data)
+
+
+class _CharCreateModal2(discord.ui.Modal, title="สร้างตัวละคร (2/3)"):
+    f_appearance = discord.ui.TextInput(label="รูปลักษณ์ภายนอก", style=discord.TextStyle.paragraph, max_length=500, placeholder="ผม ดวงตา ส่วนสูง รูปร่าง")
+    f_image_url  = discord.ui.TextInput(label="ภาพตัวละคร (URL รูป)", required=False, max_length=400)
+    f_background = discord.ui.TextInput(label="ภูมิหลัง / ประวัติ", style=discord.TextStyle.paragraph, max_length=600)
+    f_backstory2 = discord.ui.TextInput(label="ชื่อเรื่อง / Title (ถ้ามี)", required=False, max_length=80)
+
+    def __init__(self, prev: dict, applicant):
+        super().__init__()
+        self.prev = prev
+        self.applicant = applicant
+
+    async def on_submit(self, ix: discord.Interaction):
+        data = dict(self.prev)
+        data["appearance"] = self.f_appearance.value.strip()
+        data["image_url"]  = (self.f_image_url.value or "").strip()
+        data["background"] = self.f_background.value.strip()
+        data["title"]      = (self.f_backstory2.value or "").strip()
+        await ix.response.send_modal(_CharCreateModal3(data, self.applicant))
+
+
+class _CharCreateModal1(discord.ui.Modal, title="สร้างตัวละคร (1/3)"):
+    f_name   = discord.ui.TextInput(label="ชื่อตัวละคร", max_length=50)
+    f_race   = discord.ui.TextInput(label="เผ่าพันธุ์ / เชื้อชาติ", max_length=50)
+    f_gender = discord.ui.TextInput(label="เพศ", max_length=30)
+    f_role   = discord.ui.TextInput(label="ชั้น / อาชีพ", max_length=50)
+    f_age    = discord.ui.TextInput(label="อายุ", max_length=20)
+
+    def __init__(self, applicant):
+        super().__init__()
+        self.applicant = applicant
+
+    async def on_submit(self, ix: discord.Interaction):
+        data = {
+            "char_name": self.f_name.value.strip(),
+            "race":      self.f_race.value.strip(),
+            "gender":    self.f_gender.value.strip(),
+            "role":      self.f_role.value.strip(),
+            "age":       self.f_age.value.strip(),
+        }
+        await ix.response.send_modal(_CharCreateModal2(data, self.applicant))
+
+
+class _CharCreateStartView(discord.ui.View):
+    def __init__(self, uid: str, author):
+        super().__init__(timeout=300)
+        self.uid = uid
+        self.author = author
+
+    async def interaction_check(self, ix: discord.Interaction) -> bool:
+        if str(ix.user.id) != self.uid:
+            await ix.response.send_message("❌ ไม่ใช่เมนูของคุณ", ephemeral=True); return False
+        return True
+
+    @discord.ui.button(label="🌟 สร้างตัวละคร", style=discord.ButtonStyle.success, row=0)
+    async def btn_create(self, ix: discord.Interaction, _b):
+        # ตรวจว่ายังไม่มีตัวละครค้างรออนุมัติ
+        pending = _load_char_pending()
+        uid = str(ix.user.id)
+        existing = [p for p in pending.values() if p.get("uid") == uid and p.get("status") == "pending"]
+        if existing:
+            await ix.response.send_message(
+                "⏳ คุณมีใบสมัครที่รออนุมัติอยู่แล้ว กรุณารอแอดมินตรวจสอบ",
+                ephemeral=True,
+            ); return
+        await ix.response.send_modal(_CharCreateModal1(ix.user))
+
+
+# ── End Forum-based Character Creation ──────────────────────
 
 
 class OrionEditView(discord.ui.View):
@@ -2044,6 +2431,25 @@ async def orion_profile_slash(interaction: discord.Interaction):
         await interaction.response.send_message("❌ ใช้ได้เฉพาะในเซิร์ฟ Orion", ephemeral=True); return
     uid = str(interaction.user.id)
     ensure_orion_player(uid)
+    p = load_orion_players().get(uid, {})
+    # ถ้ายังไม่มีตัวละคร → แสดงหน้าสร้างตัวละคร
+    if not p.get("char_name"):
+        embed = discord.Embed(
+            title="🌟 ยังไม่มีตัวละคร",
+            description=(
+                "คุณยังไม่มีตัวละครใน Orion Guild\n\n"
+                "กดปุ่มด้านล่างเพื่อเริ่มกรอกใบสมัครตัวละคร\n"
+                "_(ระบบจะถามข้อมูล 3 ขั้นตอน รวม 12 ฟิลด์ — ต้องการอนุมัติจากแอดมิน)_"
+            ),
+            color=discord.Color.blurple(),
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        await interaction.response.send_message(
+            embed=embed,
+            view=_CharCreateStartView(uid, interaction.user),
+            ephemeral=True,
+        )
+        return
     await interaction.response.send_message(
         embed=_orion_profile_embed(uid, interaction.user),
         view=OrionProfileView(uid, interaction.user),
@@ -3042,6 +3448,163 @@ async def cmd_skill_requests(interaction: discord.Interaction):
     view = discord.ui.View(timeout=300)
     view.add_item(SkillRequestPickSelect())
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+# ── Artifact Skill Transfer (โอนสกิล) ──────────────────────────
+
+class _SkillTransferSkillSelect(discord.ui.Select):
+    def __init__(self, uid: str, author):
+        self.uid = uid
+        self.author = author
+        data = load_orion_players()
+        skills = data.get(uid, {}).get("skills", [])
+        cats = load_skill_cats()
+        transferable_cats = {c["id"] for c in cats if c.get("transferable")}
+        transferable = [
+            (i, s) for i, s in enumerate(skills)
+            if s.get("transferable") or s.get("category") in transferable_cats
+        ]
+        options = []
+        for i, s in transferable[:25]:
+            cat_label = s.get("category") or s.get("origin_type") or "—"
+            options.append(discord.SelectOption(
+                label=s.get("name", "?")[:100],
+                value=str(i),
+                description=f"{cat_label} · {s.get('description', s.get('context', ''))[:60] or '—'}",
+                emoji=s.get("icon") or s.get("emoji") or "⚙️",
+            ))
+        if not options:
+            options = [discord.SelectOption(label="ไม่มีสกิลที่โอนได้", value="none")]
+        super().__init__(placeholder="เลือกสกิลที่จะโอน...", options=options)
+
+    async def callback(self, ix: discord.Interaction):
+        if str(ix.user.id) != self.uid:
+            await ix.response.send_message("❌ ไม่ใช่เมนูของคุณ", ephemeral=True); return
+        if self.values[0] == "none":
+            await ix.response.defer(); return
+        skill_index = int(self.values[0])
+        data = load_orion_players()
+        skills = data.get(self.uid, {}).get("skills", [])
+        if skill_index >= len(skills):
+            await ix.response.send_message("❌ ไม่พบสกิล", ephemeral=True); return
+        skill = skills[skill_index]
+        await ix.response.edit_message(
+            content=f"📤 โอนสกิล **{skill.get('name','?')}** — เลือกผู้รับ ↓",
+            view=_SkillTransferRecipientView(self.uid, self.author, skill_index),
+        )
+
+
+class _SkillTransferView(discord.ui.View):
+    def __init__(self, uid: str, author):
+        super().__init__(timeout=180)
+        self.add_item(_SkillTransferSkillSelect(uid, author))
+
+
+class _SkillTransferUserSelect(discord.ui.UserSelect):
+    def __init__(self, sender_uid: str, skill_index: int):
+        self.sender_uid = sender_uid
+        self.skill_index = skill_index
+        super().__init__(placeholder="👤 เลือกผู้รับสกิล...", min_values=1, max_values=1)
+
+    async def callback(self, ix: discord.Interaction):
+        if str(ix.user.id) != self.sender_uid:
+            await ix.response.send_message("❌ ไม่ใช่เมนูของคุณ", ephemeral=True); return
+        target = self.values[0]
+        if target.bot:
+            await ix.response.send_message("❌ โอนให้บอทไม่ได้", ephemeral=True); return
+        if target.id == int(self.sender_uid):
+            await ix.response.send_message("❌ โอนให้ตัวเองไม่ได้", ephemeral=True); return
+        data = load_orion_players()
+        skills = data.get(self.sender_uid, {}).get("skills", [])
+        if self.skill_index >= len(skills):
+            await ix.response.send_message("❌ ไม่พบสกิล", ephemeral=True); return
+        skill = skills[self.skill_index]
+        await ix.response.edit_message(
+            content=(
+                f"⚠️ ยืนยันโอนสกิล **{skill.get('name','?')}** ให้ **{target.display_name}**?\n"
+                f"_(สกิลนี้จะถูก**ลบออก**จากคุณ และ**โอนให้**ผู้รับ — ไม่สามารถยกเลิกได้)_"
+            ),
+            view=_SkillTransferConfirmView(self.sender_uid, str(target.id), target.display_name, self.skill_index),
+        )
+
+
+class _SkillTransferRecipientView(discord.ui.View):
+    def __init__(self, uid: str, author, skill_index: int):
+        super().__init__(timeout=120)
+        self.add_item(_SkillTransferUserSelect(uid, skill_index))
+
+
+class _SkillTransferConfirmView(discord.ui.View):
+    def __init__(self, sender_uid: str, recv_uid: str, recv_name: str, skill_index: int):
+        super().__init__(timeout=60)
+        self.sender_uid = sender_uid
+        self.recv_uid = recv_uid
+        self.recv_name = recv_name
+        self.skill_index = skill_index
+
+    async def interaction_check(self, ix: discord.Interaction) -> bool:
+        if str(ix.user.id) != self.sender_uid:
+            await ix.response.send_message("❌ ไม่ใช่เมนูของคุณ", ephemeral=True); return False
+        return True
+
+    @discord.ui.button(label="✅ ยืนยันโอน", style=discord.ButtonStyle.danger, row=0)
+    async def btn_confirm(self, ix: discord.Interaction, _b):
+        data = load_orion_players()
+        skills = data.get(self.sender_uid, {}).get("skills", [])
+        if self.skill_index >= len(skills):
+            await ix.response.edit_message(content="❌ ไม่พบสกิล", view=None); return
+        skill = skills[self.skill_index]
+        # remove from sender
+        data[self.sender_uid]["skills"] = [s for i, s in enumerate(skills) if i != self.skill_index]
+        # add to recipient
+        ensure_orion_player(self.recv_uid)
+        data = load_orion_players()
+        data[self.recv_uid].setdefault("skills", []).append(skill)
+        save_orion_players(data)
+        await ix.response.edit_message(
+            content=f"✅ โอนสกิล **{skill.get('name','?')}** ให้ **{self.recv_name}** สำเร็จ",
+            view=None,
+        )
+        try:
+            recv_user = await bot.fetch_user(int(self.recv_uid))
+            await recv_user.send(
+                f"⚙️ คุณได้รับสกิล **{skill.get('name','?')}** จาก <@{self.sender_uid}>"
+            )
+        except Exception:
+            pass
+
+    @discord.ui.button(label="❌ ยกเลิก", style=discord.ButtonStyle.secondary, row=0)
+    async def btn_cancel(self, ix: discord.Interaction, _b):
+        await ix.response.edit_message(content="❌ ยกเลิกการโอนสกิล", view=None)
+
+
+@bot.tree.command(name="โอนสกิล", description="โอน Artifact Skill ให้ผู้เล่นคนอื่น (เฉพาะสกิลที่โอนได้)", guild=_ORION_GUILD_OBJ)
+async def cmd_transfer_skill(interaction: discord.Interaction):
+    if not interaction.guild or interaction.guild.id not in ALLOWED_COMMAND_GUILD_IDS:
+        await interaction.response.send_message("❌ ใช้ได้เฉพาะในเซิร์ฟ Orion", ephemeral=True); return
+    uid = str(interaction.user.id)
+    data = load_orion_players()
+    skills = data.get(uid, {}).get("skills", [])
+    cats = load_skill_cats()
+    transferable_cats = {c["id"] for c in cats if c.get("transferable")}
+    has_transferable = any(
+        s.get("transferable") or s.get("category") in transferable_cats
+        for s in skills
+    )
+    if not has_transferable:
+        await interaction.response.send_message(
+            "❌ คุณไม่มีสกิลที่สามารถโอนได้\n"
+            "_(เฉพาะ Artifact Skill จากระบบ Creation เท่านั้นที่โอนได้)_",
+            ephemeral=True,
+        ); return
+    await interaction.response.send_message(
+        "⚙️ เลือกสกิลที่ต้องการโอน ↓",
+        view=_SkillTransferView(uid, interaction.user),
+        ephemeral=True,
+    )
+
+
+# ── End Artifact Skill Transfer ──────────────────────────────
 
 
 @bot.command(name="orionแอดมิน", aliases=["orionprofileadmin", "orionprofileadm"])
@@ -4868,6 +5431,10 @@ import orion_casino     # register /คาสิโน /คาสิโนห้
 import orion_gacha      # register /กาชา /กาชาแอดมิน /กาชาดาวน์โหลด /กาชาอัปโหลด
 import orion_skill_toggle  # register /สกิลใช้ /สกิลตั้งCD /สกิลตั้งCDผู้เล่น
 import orion_territory  # register /พื้นที่ /สงคราม /สงครามรางวัล /พื้นที่แอดมิน
+import orion_stats      # register /ฝึกสถิติ /ฝึกสถิติแอดมิน
+import orion_creation   # register /สร้าง /สร้างแอดมิน
+import orion_missions   # register /ภารกิจ /ภารกิจแอดมิน
+import orion_config     # register /config (Orion)
 
 # ── AoT integration (Guild2 only — Attack on Titan) ──
 import aot_bot_instance   # alias to our bot
