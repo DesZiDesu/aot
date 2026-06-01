@@ -449,3 +449,115 @@ async def run_minigame(ix: discord.Interaction, key: str | None = None) -> bool:
     if key is None or key not in _MINIGAME_FNS:
         key = random.choice(MINIGAME_KEYS)
     return await _MINIGAME_FNS[key](ix)
+
+
+# ── Bilingual translation system ──────────────────────────────────────────────
+
+_STRINGS: dict[str, dict[str, str]] = {
+    "en": {
+        # ── Missions ──────────────────────────────────────────────────────────
+        "mission_new":          "⚔️ New Mission!",
+        "mission_difficulty":   "Difficulty",
+        "mission_reward":       "Reward",
+        "mission_players":      "Players",
+        "mission_description":  "Description",
+        "mission_how_to_join":  "📌 How to Join",
+        "mission_join_instr":   "1. Use `/missions` in this channel\n2. Select this mission from the list\n3. Click **✅ Join**",
+        "mission_join_btn":     "✅ Join",
+        "mission_leave_btn":    "❌ Leave",
+        "mission_details_btn":  "📋 Details",
+        "mission_full":         "This mission is full.",
+        "mission_already_in":   "You have already joined this mission.",
+        "mission_joined":       "✅ You joined **{title}**!",
+        "mission_left":         "✅ You left **{title}**.",
+        "mission_not_in":       "You are not in this mission.",
+        "mission_closed":       "This mission is no longer open.",
+        "mission_board_title":  "⚔️ Mission Board",
+        "mission_board_empty":  "No open missions right now.",
+        "mission_footer":       "Page {page}/{total}  ·  {count} open missions",
+        "mission_open":         "Open",
+        "mission_completed":    "Completed",
+        "mission_unlimited":    "∞",
+        "mission_no_char":      "You must create a character first. Use `/orion`.",
+        # ── Shop ──────────────────────────────────────────────────────────────
+        "shop_title":           "🏪 Shop",
+        "shop_empty":           "No items available.",
+        "shop_no_cats":         "No categories yet.",
+        # ── Economy ───────────────────────────────────────────────────────────
+        "wallet_title":         "💰 Wallet",
+        "transfer_confirm":     "Transfer **{amount}** to **{target}**?",
+        "transfer_no_funds":    "Insufficient funds.",
+        "transfer_self":        "You cannot transfer to yourself.",
+        # ── General ───────────────────────────────────────────────────────────
+        "confirm_btn":          "✅ Confirm",
+        "cancel_btn":           "❌ Cancel",
+        "back_btn":             "◀ Back",
+        "next_btn":             "Next ▶",
+        "prev_btn":             "◀ Prev",
+        "admin_only":           "Admin only.",
+        "no_character":         "You don't have a character yet. Use `/orion`.",
+        "done":                 "Done",
+        "saved":                "✅ Saved.",
+        "invalid_number":       "Invalid number.",
+    },
+    "th": {
+        # ── Missions ──────────────────────────────────────────────────────────
+        "mission_new":          "⚔️ ภารกิจใหม่!",
+        "mission_difficulty":   "ความยาก",
+        "mission_reward":       "รางวัล",
+        "mission_players":      "ผู้เล่น",
+        "mission_description":  "รายละเอียด",
+        "mission_how_to_join":  "📌 วิธีเข้าร่วม",
+        "mission_join_instr":   "1. ใช้คำสั่ง `/missions` ในห้องนี้\n2. เลือกภารกิจนี้จากรายการ\n3. กดปุ่ม **✅ เข้าร่วม**",
+        "mission_join_btn":     "✅ เข้าร่วม",
+        "mission_leave_btn":    "❌ ออก",
+        "mission_details_btn":  "📋 รายละเอียด",
+        "mission_full":         "ภารกิจเต็มแล้ว ไม่สามารถเข้าร่วมได้",
+        "mission_already_in":   "คุณเข้าร่วมภารกิจนี้อยู่แล้ว",
+        "mission_joined":       "✅ เข้าร่วม **{title}** แล้ว!",
+        "mission_left":         "✅ ออกจาก **{title}** แล้ว",
+        "mission_not_in":       "คุณไม่ได้อยู่ในภารกิจนี้",
+        "mission_closed":       "ภารกิจนี้ปิดแล้ว",
+        "mission_board_title":  "⚔️ กระดานภารกิจ",
+        "mission_board_empty":  "ไม่มีภารกิจที่เปิดอยู่ในขณะนี้",
+        "mission_footer":       "หน้า {page}/{total}  ·  {count} ภารกิจที่เปิด",
+        "mission_open":         "เปิด",
+        "mission_completed":    "เสร็จสิ้น",
+        "mission_unlimited":    "∞",
+        "mission_no_char":      "ต้องสร้างตัวละครก่อน ใช้ `/orion`",
+        # ── Shop ──────────────────────────────────────────────────────────────
+        "shop_title":           "🏪 ร้านค้า",
+        "shop_empty":           "ไม่มีสินค้า",
+        "shop_no_cats":         "ยังไม่มีหมวดสินค้า",
+        # ── Economy ───────────────────────────────────────────────────────────
+        "wallet_title":         "💰 กระเป๋าเงิน",
+        "transfer_confirm":     "โอน **{amount}** ให้ **{target}**?",
+        "transfer_no_funds":    "เงินไม่พอ",
+        "transfer_self":        "ไม่สามารถโอนให้ตัวเองได้",
+        # ── General ───────────────────────────────────────────────────────────
+        "confirm_btn":          "✅ ยืนยัน",
+        "cancel_btn":           "❌ ยกเลิก",
+        "back_btn":             "◀ กลับ",
+        "next_btn":             "ถัดไป ▶",
+        "prev_btn":             "◀ ก่อนหน้า",
+        "admin_only":           "เฉพาะ Admin เท่านั้น",
+        "no_character":         "ยังไม่มีตัวละคร ใช้ `/orion` เพื่อสร้าง",
+        "done":                 "เสร็จสิ้น",
+        "saved":                "✅ บันทึกแล้ว",
+        "invalid_number":       "ตัวเลขไม่ถูกต้อง",
+    },
+}
+
+
+def t_orion(gid: int, key: str, **kwargs) -> str:
+    """Return the translated string for the guild's configured language."""
+    cfg  = load_config(gid)
+    lang = cfg.get("language", "th")
+    strings = _STRINGS.get(lang) or _STRINGS["th"]
+    s = strings.get(key) or _STRINGS["th"].get(key, key)
+    if kwargs:
+        try:
+            s = s.format(**kwargs)
+        except Exception:
+            pass
+    return s
