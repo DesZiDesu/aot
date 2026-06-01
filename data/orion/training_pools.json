@@ -1,0 +1,10 @@
+{
+  "technique": {
+    "name": "Technique",
+    "emoji": "✨",
+    "icon_url": "https://cdn.discordapp.com/attachments/1499354720890785863/1509474028832948265/F4102211-B732-4FAB-8492-0DDB6E475499.png.png?ex=6a194ebd&is=6a17fd3d&hm=fe66d425b5881dbc0a8d5626a8e03d2c9d3ce77b51a720e57f4038dd9efeb790&",
+    "description": "รูปแบบกระบวนท่าทักษะการต่อสู้",
+    "minigame": "click_target",
+    "pool": []
+  }
+}

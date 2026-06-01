@@ -1,0 +1,34 @@
+{
+  "stone": {
+    "name": "หิน",
+    "emoji": "🪨",
+    "image_url": "",
+    "description": "ก้อนหินธรรมดา หาได้ทั่วไปริมทาง",
+    "sell_price": 5,
+    "type": "resource"
+  },
+  "wood": {
+    "name": "ไม้",
+    "emoji": "🪵",
+    "image_url": "",
+    "description": "ท่อนไม้สดจากต้นไม้ในป่าตะวันออก",
+    "sell_price": 3,
+    "type": "resource"
+  },
+  "iron_ore": {
+    "name": "เหล็กดิบ",
+    "emoji": "⛓️",
+    "image_url": "",
+    "description": "แร่เหล็กดิบยังไม่ผ่านการถลุง แข็งหนัก",
+    "sell_price": 12,
+    "type": "resource"
+  },
+  "herb": {
+    "name": "สมุนไพร",
+    "emoji": "🌿",
+    "image_url": "",
+    "description": "ใบไม้สมุนไพรหายาก กลิ่นหอม ใช้ทำยา",
+    "sell_price": 8,
+    "type": "resource"
+  }
+}

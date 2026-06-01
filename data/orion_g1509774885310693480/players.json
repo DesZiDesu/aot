@@ -1,0 +1,42 @@
+{
+  "1333070533914525707": {
+    "char_name": "",
+    "image_url": "",
+    "appearance": "",
+    "role": "",
+    "gender": "",
+    "race": "",
+    "skills": [],
+    "inventory": [],
+    "wallet": 100,
+    "inv": [],
+    "guild_id": "",
+    "skill_grants": [
+      {
+        "category_id": "any",
+        "remaining": 1
+      }
+    ],
+    "registered_at": "2026-05-29"
+  },
+  "1083622448982925393": {
+    "char_name": "",
+    "image_url": "",
+    "appearance": "",
+    "role": "",
+    "gender": "",
+    "race": "",
+    "skills": [],
+    "inventory": [],
+    "wallet": 100,
+    "inv": [],
+    "guild_id": "",
+    "skill_grants": [
+      {
+        "category_id": "any",
+        "remaining": 1
+      }
+    ],
+    "registered_at": "2026-05-29"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Aurum",
+  "emoji": "💰",
+  "icon_url": "",
+  "start_balance": 100,
+  "guild_create_cost": 100,
+  "guild_slot_cost": 50
+}

@@ -1,0 +1,11 @@
+{
+  "allowed_role_ids": [],
+  "passive_amount": 10,
+  "passive_interval_min": 60,
+  "passive_mode": "leader",
+  "minigame_amount": 50,
+  "minigame_keys": [
+    "guess_number"
+  ],
+  "max_members": 20
+}
