@@ -1,14 +1,16 @@
 # ============================================================
-# ORION — Unified /config command (8 pages)
+# ORION — Unified /config command (10 pages)
 # ============================================================
-# หน้า 1: General          — currency, language
-# หน้า 2: Channels         — mission board, review channel, registration role
+# หน้า 1: General           — currency, language
+# หน้า 2: Channels          — mission board, review channel, registration role
 # หน้า 3: Character Creation — forum channel, admin role, auto-assign role
-# หน้า 4: Stats Training    — rank cap, training cost, cooldown, exceed-cap roles
-# หน้า 5: Shop             — note + category count
-# หน้า 6: Scavenge         — note + /คลังไอเทม cooldown
-# หน้า 7: Jobs             — note + job count
-# หน้า 8: Creation System  — creation roles, review channel
+# หน้า 4: Stats Training     — rank cap, training cost, cooldown, exceed-cap roles
+# หน้า 5: Shop              — note + category count
+# หน้า 6: Scavenge          — note + /คลังไอเทม cooldown
+# หน้า 7: Jobs              — note + job count
+# หน้า 8: Creation System   — creation roles, review channel
+# หน้า 9: Character Options  — race/gender/occupation lists + role assignments
+# หน้า 10: Logs              — log channel setup
 # ============================================================
 
 import sys
@@ -44,8 +46,10 @@ _JOBS_FILE         = f"{ORION_DATA_DIR}/jobs.json"
 _SCAVENGE_FILE     = f"{ORION_DATA_DIR}/scavenge_pools.json"
 _SHOP_CATALOG_FILE = f"{ORION_DATA_DIR}/shop_catalog.json"
 _ITEMS_CFG_FILE    = f"{ORION_DATA_DIR}/items_config.json"
+_CHAR_OPTIONS_FILE = f"{ORION_DATA_DIR}/char_options.json"
+_LOG_CFG_FILE      = f"{ORION_DATA_DIR}/logs_config.json"
 
-_TOTAL_PAGES = 8
+_TOTAL_PAGES = 10
 
 # Rank options for stats
 _RANKS = [
@@ -124,6 +128,31 @@ def _load_jobs() -> dict:
 
 def _load_shop_catalog() -> dict:
     return load_json(_SHOP_CATALOG_FILE, {"categories": [], "items": []})
+
+
+def _load_char_options_cfg() -> dict:
+    opts = load_json(_CHAR_OPTIONS_FILE, None)
+    if opts is None:
+        opts = {"genders": [], "races": [], "occupations": [], "approved_role_ids": []}
+        save_json(_CHAR_OPTIONS_FILE, opts)
+    for k, v in [("genders", []), ("races", []), ("occupations", []), ("approved_role_ids", [])]:
+        opts.setdefault(k, v)
+    return opts
+
+
+def _save_char_options_cfg(d: dict):
+    save_json(_CHAR_OPTIONS_FILE, d)
+
+
+def _load_log_cfg() -> dict:
+    cfg = load_json(_LOG_CFG_FILE, {})
+    cfg.setdefault("log_channel_id", None)
+    cfg.setdefault("enabled", True)
+    return cfg
+
+
+def _save_log_cfg(cfg: dict):
+    save_json(_LOG_CFG_FILE, cfg)
 
 
 # ============================================================
@@ -421,6 +450,57 @@ def _build_page_embed(page: int) -> discord.Embed:
         )
         return embed
 
+    # ── Page 9: Character Options ─────────────────────────────
+    if page == 9:
+        opts = _load_char_options_cfg()
+        genders     = opts.get("genders", [])
+        races       = opts.get("races", [])
+        occupations = opts.get("occupations", [])
+        approved    = opts.get("approved_role_ids", [])
+
+        def _fmt_list(items):
+            if not items:
+                return "_ยังไม่มี_"
+            lines = []
+            for o in items[:15]:
+                lbl = o.get("label", "?")
+                rid = o.get("role_id")
+                lines.append(f"• {lbl}" + (f" → <@&{rid}>" if rid else ""))
+            return "\n".join(lines)
+
+        embed = discord.Embed(
+            title="⚙️ Config — หน้า 9: ตัวเลือกตัวละคร (Character Options)",
+            color=color,
+        )
+        embed.description = (
+            "จัดการ dropdown ที่ผู้เล่นเห็นตอนสร้างตัวละคร\n"
+            "แต่ละตัวเลือกสามารถผูก Discord Role ได้\n\n"
+            f"**เพศ ({len(genders)} ตัวเลือก):**\n{_fmt_list(genders)}\n\n"
+            f"**เผ่าพันธุ์ ({len(races)} ตัวเลือก):**\n{_fmt_list(races)}\n\n"
+            f"**ชั้น/อาชีพ ({len(occupations)} ตัวเลือก):**\n{_fmt_list(occupations)}\n\n"
+            f"**Roles เมื่อ Approve (ทุกคน):**\n{_role_list(approved)}"
+        )
+        return embed
+
+    # ── Page 10: Logs ─────────────────────────────────────────
+    if page == 10:
+        log_cfg = _load_log_cfg()
+        ch_id   = log_cfg.get("log_channel_id")
+        enabled = log_cfg.get("enabled", True)
+        embed = discord.Embed(
+            title="⚙️ Config — หน้า 10: ระบบ Logs",
+            color=color,
+        )
+        embed.description = (
+            f"**Log Channel:**\n{_ch_mention(ch_id)}\n\n"
+            f"**สถานะ Logs:** {'🟢 เปิดอยู่' if enabled else '🔴 ปิดอยู่'}\n\n"
+            "ระบบ Logs ติดตามทุกกิจกรรมของผู้เล่น:\n"
+            "💰 รับ/จ่ายเงิน · 📊 Rank สถิติขึ้น · 🔨 คราฟ · ✨ สร้างสกิล\n"
+            "⚙️ โอนสกิล · ✅ ตัวละครผ่าน · 🗑️ ลบตัวละคร · 📦 รับไอเทม\n\n"
+            "_ใช้ `/logsแอดมิน` เพื่อตั้งค่าช่อง Log โดยตรง_"
+        )
+        return embed
+
     return discord.Embed(title=f"หน้า {page}", color=color)
 
 
@@ -429,7 +509,7 @@ def _build_page_embed(page: int) -> discord.Embed:
 # ============================================================
 
 class ConfigView(discord.ui.View):
-    """Unified config panel — 8 pages, always edit_message on navigation."""
+    """Unified config panel — 10 pages, always edit_message on navigation."""
 
     def __init__(self, page: int = 1, author_id: int = 0):
         super().__init__(timeout=300)
@@ -493,6 +573,10 @@ class ConfigView(discord.ui.View):
             pass   # page 7: no edit controls
         elif p == 8:
             self._build_page8()
+        elif p == 9:
+            self._build_page9()
+        elif p == 10:
+            self._build_page10()
 
         # ── Row 4: close ──
         close_btn = discord.ui.Button(
@@ -872,6 +956,239 @@ class ConfigView(discord.ui.View):
             _save_creation_cfg(cc)
         self._build()
         await ix.response.edit_message(embed=self._page_embed(), view=self)
+
+
+    # ===========================================================
+    # PAGE 9 — Character Options (race/gender/occupation + approved roles)
+    # ===========================================================
+    def _build_page9(self):
+        # Add Race button (row 1)
+        add_race_btn = discord.ui.Button(label="➕ เพิ่ม Race", style=discord.ButtonStyle.success, row=1, custom_id="cfg_p9_add_race")
+        add_race_btn.callback = self._cb_p9_add_race
+        self.add_item(add_race_btn)
+
+        rm_race_btn = discord.ui.Button(label="➖ ลบ Race", style=discord.ButtonStyle.danger, row=1, custom_id="cfg_p9_rm_race")
+        rm_race_btn.callback = self._cb_p9_rm_race
+        self.add_item(rm_race_btn)
+
+        # Add Occupation (row 2)
+        add_occ_btn = discord.ui.Button(label="➕ เพิ่ม Occupation", style=discord.ButtonStyle.success, row=2, custom_id="cfg_p9_add_occ")
+        add_occ_btn.callback = self._cb_p9_add_occ
+        self.add_item(add_occ_btn)
+
+        rm_occ_btn = discord.ui.Button(label="➖ ลบ Occupation", style=discord.ButtonStyle.danger, row=2, custom_id="cfg_p9_rm_occ")
+        rm_occ_btn.callback = self._cb_p9_rm_occ
+        self.add_item(rm_occ_btn)
+
+        # Gender options (row 3)
+        gender_btn = discord.ui.Button(label="⚙️ ตั้ง Gender Options", style=discord.ButtonStyle.primary, row=3, custom_id="cfg_p9_gender")
+        gender_btn.callback = self._cb_p9_gender
+        self.add_item(gender_btn)
+
+        # Approved roles RoleSelect (row 4) — already occupies close button's row, so put select here
+        approved_btn = discord.ui.Button(label="🎭 Approved Roles", style=discord.ButtonStyle.primary, row=3, custom_id="cfg_p9_approved")
+        approved_btn.callback = self._cb_p9_approved
+        self.add_item(approved_btn)
+
+    async def _cb_p9_add_race(self, ix: discord.Interaction):
+        await ix.response.send_modal(_AddOptionModal(self, "race", "Race"))
+
+    async def _cb_p9_rm_race(self, ix: discord.Interaction):
+        opts = _load_char_options_cfg()
+        races = opts.get("races", [])
+        if not races:
+            await ix.response.send_message("❌ ยังไม่มี Race ที่จะลบ", ephemeral=True); return
+        await ix.response.send_message(
+            "เลือก Race ที่จะลบ:", view=_RemoveOptionView(self, "race", races), ephemeral=True,
+        )
+
+    async def _cb_p9_add_occ(self, ix: discord.Interaction):
+        await ix.response.send_modal(_AddOptionModal(self, "occupation", "Occupation/ชั้น"))
+
+    async def _cb_p9_rm_occ(self, ix: discord.Interaction):
+        opts = _load_char_options_cfg()
+        occs = opts.get("occupations", [])
+        if not occs:
+            await ix.response.send_message("❌ ยังไม่มี Occupation ที่จะลบ", ephemeral=True); return
+        await ix.response.send_message(
+            "เลือก Occupation ที่จะลบ:", view=_RemoveOptionView(self, "occupation", occs), ephemeral=True,
+        )
+
+    async def _cb_p9_gender(self, ix: discord.Interaction):
+        await ix.response.send_modal(_GenderOptionsModal(self))
+
+    async def _cb_p9_approved(self, ix: discord.Interaction):
+        await ix.response.send_message(
+            "เลือก Role ที่ผู้เล่นได้รับเมื่อ Approve ตัวละคร (เลือกได้หลาย Role):",
+            view=_ApprovedRolesView(self),
+            ephemeral=True,
+        )
+
+    # ===========================================================
+    # PAGE 10 — Logs
+    # ===========================================================
+    def _build_page10(self):
+        log_ch_sel = discord.ui.ChannelSelect(
+            placeholder="📋 เลือกช่อง Log...",
+            channel_types=[discord.ChannelType.text],
+            min_values=1,
+            max_values=1,
+            row=1,
+        )
+        log_ch_sel.callback = self._cb_p10_log_ch
+        self.add_item(log_ch_sel)
+
+        log_cfg = _load_log_cfg()
+        enabled = log_cfg.get("enabled", True)
+        toggle_btn = discord.ui.Button(
+            label="🔴 ปิด Log" if enabled else "🟢 เปิด Log",
+            style=discord.ButtonStyle.secondary,
+            row=2,
+            custom_id="cfg_p10_toggle",
+        )
+        toggle_btn.callback = self._cb_p10_toggle
+        self.add_item(toggle_btn)
+
+        clr_btn = discord.ui.Button(label="🗑️ ล้างช่อง Log", style=discord.ButtonStyle.danger, row=2, custom_id="cfg_p10_clr")
+        clr_btn.callback = self._cb_p10_clr
+        self.add_item(clr_btn)
+
+    async def _cb_p10_log_ch(self, ix: discord.Interaction):
+        ch = ix.data["values"][0] if ix.data.get("values") else None
+        if not ch:
+            await ix.response.defer(); return
+        ch_id = int(ch)
+        cfg = _load_log_cfg()
+        cfg["log_channel_id"] = ch_id
+        _save_log_cfg(cfg)
+        self._build()
+        await ix.response.edit_message(embed=self._page_embed(), view=self)
+
+    async def _cb_p10_toggle(self, ix: discord.Interaction):
+        cfg = _load_log_cfg()
+        cfg["enabled"] = not cfg.get("enabled", True)
+        _save_log_cfg(cfg)
+        self._build()
+        await ix.response.edit_message(embed=self._page_embed(), view=self)
+
+    async def _cb_p10_clr(self, ix: discord.Interaction):
+        cfg = _load_log_cfg()
+        cfg["log_channel_id"] = None
+        _save_log_cfg(cfg)
+        self._build()
+        await ix.response.edit_message(embed=self._page_embed(), view=self)
+
+
+# ============================================================
+# HELPER MODALS & VIEWS for Page 9
+# ============================================================
+
+class _AddOptionModal(discord.ui.Modal):
+    f_label  = discord.ui.TextInput(label="ชื่อ", max_length=60)
+    f_role_id = discord.ui.TextInput(label="Role ID (ว่างได้)", required=False, max_length=20, placeholder="กรอก ID ยศ Discord หรือว่าง")
+
+    def __init__(self, parent_cfg_view, option_key: str, display_name: str):
+        super().__init__(title=f"➕ เพิ่ม {display_name}")
+        self.parent  = parent_cfg_view
+        self.option_key = option_key
+
+    async def on_submit(self, ix: discord.Interaction):
+        label   = self.f_label.value.strip()
+        role_id = (self.f_role_id.value or "").strip() or None
+        if role_id:
+            try: role_id = str(int(role_id))
+            except ValueError: role_id = None
+        opts = _load_char_options_cfg()
+        key  = self.option_key + "s"  # races / occupations
+        opts.setdefault(key, [])
+        if not any(o.get("label") == label for o in opts[key]):
+            opts[key].append({"label": label, "role_id": role_id})
+        _save_char_options_cfg(opts)
+        self.parent._build()
+        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+
+
+class _RemoveOptionSelect(discord.ui.Select):
+    def __init__(self, parent_cfg_view, option_key: str, items: list):
+        self.parent = parent_cfg_view
+        self.option_key = option_key
+        opts = [discord.SelectOption(label=o["label"][:100], value=o["label"]) for o in items[:25]]
+        super().__init__(placeholder="เลือกตัวเลือกที่จะลบ...", options=opts)
+
+    async def callback(self, ix: discord.Interaction):
+        label = self.values[0]
+        opts  = _load_char_options_cfg()
+        key   = self.option_key + "s"
+        opts[key] = [o for o in opts.get(key, []) if o.get("label") != label]
+        _save_char_options_cfg(opts)
+        self.parent._build()
+        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+
+
+class _RemoveOptionView(discord.ui.View):
+    def __init__(self, parent_cfg_view, option_key: str, items: list):
+        super().__init__(timeout=120)
+        self.add_item(_RemoveOptionSelect(parent_cfg_view, option_key, items))
+
+
+class _GenderOptionsModal(discord.ui.Modal, title="⚙️ ตั้ง Gender Options"):
+    f_list = discord.ui.TextInput(
+        label="รายชื่อเพศ (คั่นด้วย , หรือขึ้นบรรทัดใหม่)",
+        style=discord.TextStyle.paragraph,
+        placeholder="ชาย\nหญิง\nไม่ระบุ",
+        max_length=500,
+    )
+
+    def __init__(self, parent_cfg_view):
+        super().__init__()
+        self.parent = parent_cfg_view
+        opts = _load_char_options_cfg()
+        current = ", ".join(o.get("label","") for o in opts.get("genders", []))
+        self.f_list.default = current
+
+    async def on_submit(self, ix: discord.Interaction):
+        raw   = self.f_list.value
+        labels = [l.strip() for l in raw.replace(",", "\n").splitlines() if l.strip()]
+        opts  = _load_char_options_cfg()
+        existing = {o["label"]: o.get("role_id") for o in opts.get("genders", [])}
+        opts["genders"] = [{"label": l, "role_id": existing.get(l)} for l in labels]
+        _save_char_options_cfg(opts)
+        self.parent._build()
+        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+
+
+class _ApprovedRolesSelect(discord.ui.RoleSelect):
+    def __init__(self, parent_cfg_view):
+        self.parent = parent_cfg_view
+        super().__init__(placeholder="🎭 เลือก Role ที่ได้รับเมื่อ Approve...", min_values=1, max_values=10)
+
+    async def callback(self, ix: discord.Interaction):
+        role_ids = [str(r.id) for r in self.values]
+        opts = _load_char_options_cfg()
+        opts["approved_role_ids"] = list(set(opts.get("approved_role_ids", []) + role_ids))
+        _save_char_options_cfg(opts)
+        self.parent._build()
+        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+
+
+class _ClearApprovedBtn(discord.ui.Button):
+    def __init__(self, parent_cfg_view):
+        super().__init__(label="🗑️ ล้าง Approved Roles", style=discord.ButtonStyle.danger)
+        self.parent = parent_cfg_view
+
+    async def callback(self, ix: discord.Interaction):
+        opts = _load_char_options_cfg()
+        opts["approved_role_ids"] = []
+        _save_char_options_cfg(opts)
+        self.parent._build()
+        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+
+
+class _ApprovedRolesView(discord.ui.View):
+    def __init__(self, parent_cfg_view):
+        super().__init__(timeout=180)
+        self.add_item(_ApprovedRolesSelect(parent_cfg_view))
+        self.add_item(_ClearApprovedBtn(parent_cfg_view))
 
 
 # ============================================================
