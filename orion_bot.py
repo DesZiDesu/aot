@@ -4859,6 +4859,7 @@ async def cmd_guild(interaction: discord.Interaction):
 # ████████████████████████████████████████████████████████████
 import orion_training   # register /ฝึกสกิล /ฝึกแอดมิน
 import orion_scavenge   # register /หาของ /หาของแอดมิน /หาของห้อง
+import orion_job        # register /งาน /งาน-เจ้าของ /งาน-แอดมิน + passive loop
 import orion_familia    # register /familia /familiaแอดมิน + passive loop
 import orion_auction    # register /ลงประมูล /ประมูล /ปิดประมูล /ดูประมูล /ประมูลแอดมิน
 import orion_shop       # register /ร้าน /ร้านแอดมิน /ร้านอัปโหลด /คูปอง
