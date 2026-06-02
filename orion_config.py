@@ -578,11 +578,11 @@ class ConfigView(discord.ui.View):
         elif p == 10:
             self._build_page10()
 
-        # ── Row 4: close ──
+        # ── Row 0: close (อยู่กับ nav เพื่อ free row 4 ให้ page content) ──
         close_btn = discord.ui.Button(
             label="❌ ปิด",
             style=discord.ButtonStyle.danger,
-            row=4,
+            row=0,
             custom_id="cfg_close",
         )
         close_btn.callback = self._cb_close
@@ -688,12 +688,12 @@ class ConfigView(discord.ui.View):
         review_sel.callback = self._cb_p2_review_ch
         self.add_item(review_sel)
 
-        # Registration role select (row 2)
+        # Registration role select (row 4)
         reg_role_sel = discord.ui.RoleSelect(
             placeholder="🎭 เปลี่ยน Registration Role",
             min_values=1,
             max_values=1,
-            row=2,
+            row=4,
             custom_id="cfg_p2_reg_role",
         )
         reg_role_sel.callback = self._cb_p2_reg_role
@@ -1110,7 +1110,7 @@ class _AddOptionModal(discord.ui.Modal):
 
 class _RemoveOptionSelect(discord.ui.Select):
     def __init__(self, parent_cfg_view, option_key: str, items: list):
-        self.parent = parent_cfg_view
+        self.cfg_view = parent_cfg_view
         self.option_key = option_key
         opts = [discord.SelectOption(label=o["label"][:100], value=o["label"]) for o in items[:25]]
         super().__init__(placeholder="เลือกตัวเลือกที่จะลบ...", options=opts)
@@ -1121,8 +1121,8 @@ class _RemoveOptionSelect(discord.ui.Select):
         key   = self.option_key + "s"
         opts[key] = [o for o in opts.get(key, []) if o.get("label") != label]
         _save_char_options_cfg(opts)
-        self.parent._build()
-        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+        self.cfg_view._build()
+        await ix.response.edit_message(embed=self.cfg_view._page_embed(), view=self.cfg_view)
 
 
 class _RemoveOptionView(discord.ui.View):
@@ -1159,29 +1159,30 @@ class _GenderOptionsModal(discord.ui.Modal, title="⚙️ ตั้ง Gender Op
 
 class _ApprovedRolesSelect(discord.ui.RoleSelect):
     def __init__(self, parent_cfg_view):
-        self.parent = parent_cfg_view
-        super().__init__(placeholder="🎭 เลือก Role ที่ได้รับเมื่อ Approve...", min_values=1, max_values=10)
+        self.cfg_view = parent_cfg_view
+        super().__init__(placeholder="🎭 เลือก Role ที่ได้รับเมื่อ Approve...",
+                         min_values=1, max_values=10, row=0)
 
     async def callback(self, ix: discord.Interaction):
         role_ids = [str(r.id) for r in self.values]
         opts = _load_char_options_cfg()
         opts["approved_role_ids"] = list(set(opts.get("approved_role_ids", []) + role_ids))
         _save_char_options_cfg(opts)
-        self.parent._build()
-        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+        self.cfg_view._build()
+        await ix.response.edit_message(embed=self.cfg_view._page_embed(), view=self.cfg_view)
 
 
 class _ClearApprovedBtn(discord.ui.Button):
     def __init__(self, parent_cfg_view):
-        super().__init__(label="🗑️ ล้าง Approved Roles", style=discord.ButtonStyle.danger)
-        self.parent = parent_cfg_view
+        super().__init__(label="🗑️ ล้าง Approved Roles", style=discord.ButtonStyle.danger, row=1)
+        self.cfg_view = parent_cfg_view
 
     async def callback(self, ix: discord.Interaction):
         opts = _load_char_options_cfg()
         opts["approved_role_ids"] = []
         _save_char_options_cfg(opts)
-        self.parent._build()
-        await ix.response.edit_message(embed=self.parent._page_embed(), view=self.parent)
+        self.cfg_view._build()
+        await ix.response.edit_message(embed=self.cfg_view._page_embed(), view=self.cfg_view)
 
 
 class _ApprovedRolesView(discord.ui.View):

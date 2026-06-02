@@ -779,4 +779,5 @@ async def cmd_job_admin(ix: discord.Interaction):
 
 
 # ── start background task ─────────────────────────────────────
-start_job_tasks()
+# NOTE: ห้ามเรียก start_job_tasks() ที่ระดับ module — ยังไม่มี event loop
+# orion_bot.py จะเรียกใน on_ready ให้แทน

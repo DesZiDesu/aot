@@ -243,7 +243,6 @@ async def shifter_open(ix: discord.Interaction):
 @shifter_group.command(name="admin", description="Shifter admin panel")
 async def shifter_admin(ix: discord.Interaction):
     if not ix.guild or ix.guild.id != GUILD2_ID: return
-    if not ix.guild: return
     m = ix.guild.get_member(ix.user.id)
     if not m or not (m.guild_permissions.administrator or m.guild_permissions.manage_guild):
         v = LayoutView(timeout=60)
@@ -751,9 +750,12 @@ class ShifterEatConsentView(LayoutView):
                 from aot_shared import save_config
                 save_config(self.gid, cfg)
                 players[str(self.eater_uid)] = eater_player
-                await cv2_dm(players.get(str(self.eater_uid), {}) and
-                             (lambda: None)() or ix.user,
-                             t(self.gid, "mindless_power_guide", titan=got_titan))
+                try:
+                    eater_user = await bot.fetch_user(int(self.eater_uid))
+                    await cv2_dm(eater_user,
+                                 t(self.gid, "mindless_power_guide", titan=got_titan))
+                except Exception:
+                    pass
 
         players[str(self.target_uid)] = target_player
         save_players(self.gid, players)

@@ -75,6 +75,9 @@ def load_stats_config() -> dict:
         ("training_cost",      50),
         ("cooldown_seconds",   3600),
         ("exceed_cap_role_ids", []),
+        ("exp_gain_min",       20),   # min XP per training
+        ("exp_gain_max",       50),   # max XP per training
+        ("exp_boosts",         {}),   # {uid: {"multiplier": float, "expires_at": float or 0}}
     ]:
         if k not in cfg:
             cfg[k] = v
@@ -541,13 +544,28 @@ class TrainingAttrView(discord.ui.View):
 
             # apply XP
             if success:
-                xp_gain = random.randint(10, 20)
+                xp_min = cfg.get("exp_gain_min", 20)
+                xp_max = cfg.get("exp_gain_max", 50)
+                if xp_min > xp_max:
+                    xp_min, xp_max = xp_max, xp_min
+                xp_gain = random.randint(xp_min, xp_max)
                 result_color = 0x2ecc71
                 result_title = "✅ ฝึกสำเร็จ!"
             else:
-                xp_gain = random.randint(2, 5)
+                xp_max = cfg.get("exp_gain_max", 50)
+                half_min = max(1, xp_max // 4)
+                half_max = max(2, xp_max // 2)
+                xp_gain = random.randint(half_min, half_max)
                 result_color = 0xe74c3c
                 result_title = "❌ ล้มเหลว — ได้ XP เล็กน้อย"
+
+            # apply boost multiplier if active
+            boost_entry = cfg.get("exp_boosts", {}).get(self.uid)
+            if boost_entry:
+                exp_at = boost_entry.get("expires_at", 0)
+                if exp_at == 0 or exp_at > now:
+                    multiplier = float(boost_entry.get("multiplier", 1.0))
+                    xp_gain = int(xp_gain * multiplier)
 
             apply_result = _apply_xp(self.uid, attr_key, xp_gain)
             entry = apply_result["entry"]
@@ -697,6 +715,231 @@ class ResetPlayerAttrView(discord.ui.View):
         self.add_item(ResetPlayerAttrUserSelect())
 
 
+# ── Admin: Edit Player Stats ───────────────────────────────────────────────────
+
+class _AdminStatsEditPlayerSelect(discord.ui.UserSelect):
+    def __init__(self):
+        super().__init__(
+            placeholder="✏️ เลือกผู้เล่นที่จะแก้ไข stats",
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(self, ix: discord.Interaction):
+        target = self.values[0]
+        if target.bot:
+            await ix.response.send_message("❌ ไม่ใช่ผู้เล่น", ephemeral=True)
+            return
+        uid = str(target.id)
+        ensure_orion_player(uid)
+        data = load_orion_players()
+        _ensure_attrs(data[uid])
+        player = data[uid]
+        attrs = player.get("attrs", {})
+
+        modal = _AdminStatsEditModal(uid, target.display_name, attrs, player)
+        await ix.response.send_modal(modal)
+
+
+class _AdminStatsEditModal(discord.ui.Modal, title="✏️ แก้ไข Stats ผู้เล่น"):
+    # strength rank/xp
+    f_str_rank = discord.ui.TextInput(label="Strength rank_idx (0-18)", max_length=3)
+    f_str_xp   = discord.ui.TextInput(label="Strength XP (0-99)", max_length=3)
+    # endurance
+    f_end_rank = discord.ui.TextInput(label="Endurance rank_idx (0-18)", max_length=3)
+    f_end_xp   = discord.ui.TextInput(label="Endurance XP (0-99)", max_length=3)
+
+    def __init__(self, uid: str, display_name: str, attrs: dict, player: dict):
+        super().__init__()
+        self.uid = uid
+        self.display_name = display_name
+        self.title = f"✏️ แก้ไข Stats — {display_name[:30]}"
+        # pre-fill
+        self.f_str_rank.default = str(attrs.get("strength", {}).get("rank_idx", 0))
+        self.f_str_xp.default   = str(attrs.get("strength", {}).get("xp", 0))
+        self.f_end_rank.default = str(attrs.get("endurance", {}).get("rank_idx", 0))
+        self.f_end_xp.default   = str(attrs.get("endurance", {}).get("xp", 0))
+
+    async def on_submit(self, ix: discord.Interaction):
+        data = load_orion_players()
+        player = data.get(self.uid, {})
+        _ensure_attrs(player)
+        try:
+            player["attrs"]["strength"]["rank_idx"]  = max(0, min(MAX_RANK_IDX, int(self.f_str_rank.value.strip())))
+            player["attrs"]["strength"]["xp"]        = max(0, min(XP_PER_RANK - 1, int(self.f_str_xp.value.strip())))
+            player["attrs"]["endurance"]["rank_idx"] = max(0, min(MAX_RANK_IDX, int(self.f_end_rank.value.strip())))
+            player["attrs"]["endurance"]["xp"]       = max(0, min(XP_PER_RANK - 1, int(self.f_end_xp.value.strip())))
+        except ValueError:
+            await ix.response.send_message("❌ ค่าต้องเป็นตัวเลข", ephemeral=True)
+            return
+        data[self.uid] = player
+        save_orion_players(data)
+        await ix.response.send_message(
+            f"✅ แก้ไข stats ของ **{self.display_name}** แล้ว "
+            f"(Str: {RANKS[player['attrs']['strength']['rank_idx']]}, "
+            f"End: {RANKS[player['attrs']['endurance']['rank_idx']]})",
+            ephemeral=True,
+        )
+
+
+class _AdminStatsEditSpeedPercSelect(discord.ui.UserSelect):
+    """Second modal — Speed, Perception, wallet."""
+    def __init__(self):
+        super().__init__(
+            placeholder="✏️ แก้ไข Speed/Perception/Wallet",
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(self, ix: discord.Interaction):
+        target = self.values[0]
+        if target.bot:
+            await ix.response.send_message("❌ ไม่ใช่ผู้เล่น", ephemeral=True)
+            return
+        uid = str(target.id)
+        ensure_orion_player(uid)
+        data = load_orion_players()
+        _ensure_attrs(data[uid])
+        player = data[uid]
+        attrs = player.get("attrs", {})
+        modal = _AdminStatsEditModal2(uid, target.display_name, attrs, player)
+        await ix.response.send_modal(modal)
+
+
+class _AdminStatsEditModal2(discord.ui.Modal, title="✏️ แก้ไข Speed/Perception/Wallet"):
+    f_spd_rank  = discord.ui.TextInput(label="Speed rank_idx (0-18)",      max_length=3)
+    f_spd_xp    = discord.ui.TextInput(label="Speed XP (0-99)",            max_length=3)
+    f_perc_rank = discord.ui.TextInput(label="Perception rank_idx (0-18)", max_length=3)
+    f_perc_xp   = discord.ui.TextInput(label="Perception XP (0-99)",       max_length=3)
+
+    def __init__(self, uid: str, display_name: str, attrs: dict, player: dict):
+        super().__init__()
+        self.uid = uid
+        self.display_name = display_name
+        self.f_spd_rank.default  = str(attrs.get("speed", {}).get("rank_idx", 0))
+        self.f_spd_xp.default    = str(attrs.get("speed", {}).get("xp", 0))
+        self.f_perc_rank.default = str(attrs.get("perception", {}).get("rank_idx", 0))
+        self.f_perc_xp.default   = str(attrs.get("perception", {}).get("xp", 0))
+
+    async def on_submit(self, ix: discord.Interaction):
+        data = load_orion_players()
+        player = data.get(self.uid, {})
+        _ensure_attrs(player)
+        try:
+            player["attrs"]["speed"]["rank_idx"]       = max(0, min(MAX_RANK_IDX, int(self.f_spd_rank.value.strip())))
+            player["attrs"]["speed"]["xp"]             = max(0, min(XP_PER_RANK - 1, int(self.f_spd_xp.value.strip())))
+            player["attrs"]["perception"]["rank_idx"]  = max(0, min(MAX_RANK_IDX, int(self.f_perc_rank.value.strip())))
+            player["attrs"]["perception"]["xp"]        = max(0, min(XP_PER_RANK - 1, int(self.f_perc_xp.value.strip())))
+        except ValueError:
+            await ix.response.send_message("❌ ค่าต้องเป็นตัวเลข", ephemeral=True)
+            return
+        data[self.uid] = player
+        save_orion_players(data)
+        await ix.response.send_message(
+            f"✅ แก้ไข Speed/Perception ของ **{self.display_name}** แล้ว",
+            ephemeral=True,
+        )
+
+
+class AdminStatsEditView(discord.ui.View):
+    """View with two UserSelects for editing Str/End and Spd/Perc."""
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(_AdminStatsEditPlayerSelect())
+        self.add_item(_AdminStatsEditSpeedPercSelect())
+
+
+# ── Admin: Boost EXP ──────────────────────────────────────────────────────────
+
+class _BoostAddModal(discord.ui.Modal, title="🚀 เพิ่ม EXP Boost"):
+    f_uid        = discord.ui.TextInput(label="User ID", max_length=25)
+    f_multiplier = discord.ui.TextInput(label="Multiplier (เช่น 1.5, 2.0)", max_length=10)
+    f_hours      = discord.ui.TextInput(
+        label="ระยะเวลา (ชั่วโมง, 0 = ถาวร)", max_length=10, placeholder="0",
+    )
+
+    async def on_submit(self, ix: discord.Interaction):
+        try:
+            uid_val  = self.f_uid.value.strip()
+            mult     = float(self.f_multiplier.value.strip())
+            hours    = float(self.f_hours.value.strip() or "0")
+        except ValueError:
+            await ix.response.send_message("❌ ค่าไม่ถูกต้อง", ephemeral=True)
+            return
+        expires_at = 0.0 if hours <= 0 else time.time() + hours * 3600
+        cfg = load_stats_config()
+        cfg.setdefault("exp_boosts", {})[uid_val] = {
+            "multiplier": mult,
+            "expires_at": expires_at,
+        }
+        save_stats_config(cfg)
+        dur_str = "ถาวร" if expires_at == 0 else f"{hours:.1f} ชม."
+        await ix.response.send_message(
+            f"✅ เพิ่ม Boost ×**{mult}** ให้ <@{uid_val}> ({dur_str})",
+            ephemeral=True,
+        )
+
+
+class _BoostRemoveModal(discord.ui.Modal, title="🗑️ ลบ EXP Boost"):
+    f_uid = discord.ui.TextInput(label="User ID ที่จะลบ Boost", max_length=25)
+
+    async def on_submit(self, ix: discord.Interaction):
+        uid_val = self.f_uid.value.strip()
+        cfg = load_stats_config()
+        boosts = cfg.get("exp_boosts", {})
+        if uid_val in boosts:
+            del boosts[uid_val]
+            cfg["exp_boosts"] = boosts
+            save_stats_config(cfg)
+            await ix.response.send_message(f"✅ ลบ Boost ของ <@{uid_val}> แล้ว", ephemeral=True)
+        else:
+            await ix.response.send_message(f"❌ ไม่พบ Boost สำหรับ `{uid_val}`", ephemeral=True)
+
+
+class _BoostEXPView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    async def interaction_check(self, ix: discord.Interaction) -> bool:
+        if not ix.user.guild_permissions.administrator:
+            await ix.response.send_message("❌ ต้องเป็นแอดมิน", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="📋 ดู Boosts ทั้งหมด", style=discord.ButtonStyle.primary, row=0)
+    async def btn_list(self, ix: discord.Interaction, _b):
+        cfg    = load_stats_config()
+        boosts = cfg.get("exp_boosts", {})
+        now    = time.time()
+        if not boosts:
+            await ix.response.send_message("ยังไม่มี Boost ที่ใช้งานอยู่", ephemeral=True)
+            return
+        lines = []
+        for uid_val, entry in boosts.items():
+            mult   = entry.get("multiplier", 1.0)
+            exp_at = entry.get("expires_at", 0)
+            if exp_at == 0:
+                dur = "ถาวร"
+            elif exp_at > now:
+                hrs = int((exp_at - now) / 3600)
+                dur = f"{hrs}ชม. เหลือ"
+            else:
+                dur = "หมดอายุ"
+            lines.append(f"• <@{uid_val}> — ×{mult} ({dur})")
+        await ix.response.send_message(
+            "**🚀 EXP Boosts ทั้งหมด:**\n" + "\n".join(lines),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="➕ เพิ่ม Boost", style=discord.ButtonStyle.success, row=0)
+    async def btn_add(self, ix: discord.Interaction, _b):
+        await ix.response.send_modal(_BoostAddModal())
+
+    @discord.ui.button(label="🗑️ ลบ Boost", style=discord.ButtonStyle.danger, row=0)
+    async def btn_remove(self, ix: discord.Interaction, _b):
+        await ix.response.send_modal(_BoostRemoveModal())
+
+
 class StatsAdminView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
@@ -732,7 +975,23 @@ class StatsAdminView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="❌ ปิด", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="✏️ แก้ไข Stats ผู้เล่น", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_edit_stats(self, ix: discord.Interaction, _b):
+        await ix.response.send_message(
+            "✏️ เลือกผู้เล่นที่จะแก้ไข Stats (แถวบน = Str/End, แถวล่าง = Spd/Perc):",
+            view=AdminStatsEditView(),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="🚀 จัดการ EXP Boost", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_boost_exp(self, ix: discord.Interaction, _b):
+        await ix.response.send_message(
+            "🚀 จัดการ EXP Boost สำหรับผู้เล่น:",
+            view=_BoostEXPView(),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="❌ ปิด", style=discord.ButtonStyle.secondary, row=2)
     async def btn_close(self, ix: discord.Interaction, _b):
         try:
             await ix.response.edit_message(content="✓ ปิดแล้ว", embed=None, view=None)
@@ -790,14 +1049,21 @@ async def cmd_train_stats(interaction: discord.Interaction):
     last_train = float(player.get("training_cooldown", 0))
     now        = time.time()
     remaining  = int(last_train + cooldown_sec - now)
+
+    char_name = player.get("char_name") or interaction.user.display_name
+    embed = stats_embed(uid, char_name)
+
     if remaining > 0:
         h, rem = divmod(remaining, 3600)
         m, s   = divmod(rem, 60)
         time_str = (f"{h}ชม. {m}นาที" if h else f"{m}นาที {s}วิ") if remaining >= 60 else f"{remaining}วิ"
-        await interaction.response.send_message(
-            f"⏳ คูลดาวน์ยังไม่หมด — รออีก **{time_str}**",
-            ephemeral=True,
+        embed.description = (
+            f"{embed.description}\n\n"
+            f"⏳ **คูลดาวน์ยังไม่หมด** — รออีก **{time_str}**\n"
+            "_ดูสถิติปัจจุบันของคุณด้านบน_"
         )
+        embed.color = discord.Color.orange()
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
     # balance check
@@ -809,8 +1075,6 @@ async def cmd_train_stats(interaction: discord.Interaction):
         )
         return
 
-    char_name = player.get("char_name") or interaction.user.display_name
-    embed = stats_embed(uid, char_name)
     embed.description = (
         f"{embed.description}\n\n"
         f"ค่าฝึก: {money_str(cost)}\n"
